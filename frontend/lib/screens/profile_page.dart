@@ -1,7 +1,87 @@
 import 'package:flutter/material.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+import 'package:image_picker/image_picker.dart';
+import 'dart:io';
 
-class ProfilePage extends StatelessWidget {
+class ProfilePage extends StatefulWidget {
   const ProfilePage({super.key});
+
+  @override
+  State<ProfilePage> createState() => _ProfilePageState();
+}
+
+class _ProfilePageState extends State<ProfilePage> {
+  String admissionNumber = "";
+  String role = "";
+  String email = "";
+  String phone = "";
+  String name = "User";
+  String department = "Unknown";
+  String location = "Unknown";
+  String profileImagePath = ""; // ✅ Path to profile image
+
+  final TextEditingController nameController = TextEditingController();
+  final TextEditingController emailController = TextEditingController();
+  final TextEditingController phoneController = TextEditingController();
+
+  @override
+  void initState() {
+    super.initState();
+    _loadUserData();
+  }
+
+  Future<void> _loadUserData() async {
+    SharedPreferences prefs = await SharedPreferences.getInstance();
+    setState(() {
+      admissionNumber = prefs.getString('admission_number') ?? "N/A";
+      role = prefs.getString('role') ?? "N/A";
+      email = prefs.getString('email') ?? "N/A";
+      phone = prefs.getString('phone') ?? "N/A";
+      name = prefs.getString('name') ?? "User";
+      department = prefs.getString('department') ?? "Unknown";
+      location = prefs.getString('location') ?? "Unknown";
+      profileImagePath = prefs.getString('profile_image') ?? "";
+    });
+
+    nameController.text = name;
+    emailController.text = email;
+    phoneController.text = phone;
+  }
+
+  Future<void> _updateUserData() async {
+    SharedPreferences prefs = await SharedPreferences.getInstance();
+    await prefs.setString('name', nameController.text);
+    await prefs.setString('email', emailController.text);
+    await prefs.setString('phone', phoneController.text);
+
+    setState(() {
+      name = nameController.text;
+      email = emailController.text;
+      phone = phoneController.text;
+    });
+
+    Navigator.pop(context);
+  }
+
+  Future<void> _logout() async {
+    SharedPreferences prefs = await SharedPreferences.getInstance();
+    await prefs.clear(); // ✅ Clear saved user data
+    Navigator.of(context).pushReplacementNamed('/login');
+  }
+
+  Future<void> _pickProfileImage() async {
+    final ImagePicker picker = ImagePicker();
+    final XFile? image = await picker.pickImage(source: ImageSource.gallery);
+
+    if (image != null) {
+      SharedPreferences prefs = await SharedPreferences.getInstance();
+      await prefs.setString('profile_image', image.path);
+
+      setState(() {
+        profileImagePath = image.path;
+      });
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -14,49 +94,57 @@ class ProfilePage extends StatelessWidget {
         child: Column(
           children: [
             const SizedBox(height: 20),
-            const CircleAvatar(
-              radius: 50,
-              backgroundImage: AssetImage('assets/profile_picture.jpg'),
+            GestureDetector(
+              onTap: _pickProfileImage, // ✅ Upload profile picture
+              child: CircleAvatar(
+                radius: 50,
+                backgroundImage: profileImagePath.isNotEmpty
+                    ? FileImage(File(profileImagePath)) as ImageProvider
+                    : const AssetImage('assets/default_profile.png'),
+                child: Align(
+                  alignment: Alignment.bottomRight,
+                  child: CircleAvatar(
+                    backgroundColor: Colors.white,
+                    radius: 15,
+                    child: Icon(Icons.camera_alt,
+                        color: Theme.of(context).primaryColor, size: 20),
+                  ),
+                ),
+              ),
             ),
             const SizedBox(height: 10),
-            const Text(
-              'John Doe',
-              style: TextStyle(
-                fontSize: 24,
-                fontWeight: FontWeight.bold,
-              ),
+            Text(
+              name,
+              style: const TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
             ),
-            const Text(
-              'Computer Science - Year 3',
-              style: TextStyle(
-                fontSize: 16,
-                color: Colors.grey,
-              ),
+            Text(
+              '$department - ${role.toUpperCase()}',
+              style: const TextStyle(fontSize: 16, color: Colors.grey),
             ),
             const SizedBox(height: 20),
-            _buildInfoCard(context),
+            _buildInfoCard(),
             const SizedBox(height: 20),
-            _buildActionButtons(context),
+            _buildActionButtons(),
           ],
         ),
       ),
     );
   }
 
-  Widget _buildInfoCard(BuildContext context) {
+  Widget _buildInfoCard() {
     return Card(
       margin: const EdgeInsets.symmetric(horizontal: 16.0),
       child: Padding(
         padding: const EdgeInsets.all(16.0),
         child: Column(
           children: [
-            _buildInfoRow(Icons.email, 'john.doe@example.com'),
+            _buildInfoRow(Icons.email, email),
             const Divider(),
-            _buildInfoRow(Icons.phone, '+1 (555) 123-4567'),
+            _buildInfoRow(Icons.phone, phone),
             const Divider(),
-            _buildInfoRow(Icons.location_on, 'New York, NY'),
+            _buildInfoRow(Icons.location_on, location),
             const Divider(),
-            _buildInfoRow(Icons.school, 'Student ID: 12345678'),
+            _buildInfoRow(Icons.school, 'Admission No: $admissionNumber'),
           ],
         ),
       ),
@@ -76,13 +164,11 @@ class ProfilePage extends StatelessWidget {
     );
   }
 
-  Widget _buildActionButtons(BuildContext context) {
+  Widget _buildActionButtons() {
     return Column(
       children: [
         ElevatedButton(
-          onPressed: () {
-            // Handle edit profile
-          },
+          onPressed: _showEditProfileDialog, // ✅ Edit details
           style: ElevatedButton.styleFrom(
             backgroundColor: Theme.of(context).primaryColor,
             minimumSize: const Size(200, 40),
@@ -91,21 +177,7 @@ class ProfilePage extends StatelessWidget {
         ),
         const SizedBox(height: 10),
         ElevatedButton(
-          onPressed: () {
-            // Handle change password
-          },
-          style: ElevatedButton.styleFrom(
-            backgroundColor: Theme.of(context).primaryColor,
-            minimumSize: const Size(200, 40),
-          ),
-          child: const Text('Change Password'),
-        ),
-        const SizedBox(height: 10),
-        ElevatedButton(
-          onPressed: () {
-            // Handle logout
-            Navigator.of(context).pushReplacementNamed('/login');
-          },
+          onPressed: _logout, // ✅ Logout function
           style: ElevatedButton.styleFrom(
             backgroundColor: Colors.red,
             minimumSize: const Size(200, 40),
@@ -113,6 +185,46 @@ class ProfilePage extends StatelessWidget {
           child: const Text('Logout'),
         ),
       ],
+    );
+  }
+
+  void _showEditProfileDialog() {
+    showDialog(
+      context: context,
+      builder: (context) {
+        return AlertDialog(
+          title: const Text("Edit Profile"),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              TextFormField(
+                controller: nameController,
+                decoration: const InputDecoration(labelText: "Name"),
+              ),
+              const SizedBox(height: 10),
+              TextFormField(
+                controller: emailController,
+                decoration: const InputDecoration(labelText: "Email"),
+              ),
+              const SizedBox(height: 10),
+              TextFormField(
+                controller: phoneController,
+                decoration: const InputDecoration(labelText: "Phone"),
+              ),
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text("Cancel"),
+            ),
+            ElevatedButton(
+              onPressed: _updateUserData, // ✅ Update data
+              child: const Text("Save"),
+            ),
+          ],
+        );
+      },
     );
   }
 }

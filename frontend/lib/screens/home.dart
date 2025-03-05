@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'academics_page.dart';
 import 'announcements_page.dart';
 import 'profile_page.dart';
+import 'chatbot_page.dart'; // ✅ Added ChatbotPage
 
 class HomeScreen extends StatefulWidget {
   final String userName;
@@ -15,17 +16,29 @@ class HomeScreen extends StatefulWidget {
 class HomeScreenState extends State<HomeScreen> {
   int _selectedIndex = 0;
 
-  static const List<Widget> _widgetOptions = <Widget>[
-    HomeContent(),
-    AcademicsPage(),
-    AnnouncementsPage(),
-    ProfilePage(),
-  ];
+  static late List<Widget> _widgetOptions;
+
+  @override
+  void initState() {
+    super.initState();
+    _widgetOptions = [
+      const HomeContent(),
+      const ChatbotPage(), // ✅ Added ChatbotPage
+      const AcademicsPage(),
+      const AnnouncementsPage(),
+      const ProfilePage(),
+    ];
+  }
 
   void _onItemTapped(int index) {
-    setState(() {
-      _selectedIndex = index;
-    });
+    if (index >= 0 && index < _widgetOptions.length) {
+      // ✅ Prevents RangeError
+      setState(() {
+        _selectedIndex = index;
+      });
+    } else {
+      print("Invalid index: $index"); // ✅ Debugging
+    }
   }
 
   @override
@@ -37,7 +50,9 @@ class HomeScreenState extends State<HomeScreen> {
           CircleAvatar(
             backgroundColor: Theme.of(context).primaryColorLight,
             child: Text(
-              widget.userName[0].toUpperCase(),
+              widget.userName.isNotEmpty
+                  ? widget.userName[0].toUpperCase()
+                  : "?",
               style: TextStyle(
                 fontWeight: FontWeight.bold,
                 color: Theme.of(context).primaryColor,
@@ -47,31 +62,18 @@ class HomeScreenState extends State<HomeScreen> {
           const SizedBox(width: 10),
         ],
       ),
-      body: Center(
-        child: _widgetOptions.elementAt(_selectedIndex),
-      ),
+      body: _selectedIndex < _widgetOptions.length
+          ? _widgetOptions[_selectedIndex]
+          : const Center(child: Text("Page Not Found")), // ✅ Prevents crash
       bottomNavigationBar: BottomNavigationBar(
         items: const <BottomNavigationBarItem>[
+          BottomNavigationBarItem(icon: Icon(Icons.home), label: 'Home'),
           BottomNavigationBarItem(
-            icon: Icon(Icons.home),
-            label: 'Home',
-          ),
+              icon: Icon(Icons.chat), label: 'Chatbot'), // ✅ Chatbot fixed
+          BottomNavigationBarItem(icon: Icon(Icons.school), label: 'Academics'),
           BottomNavigationBarItem(
-            icon: Icon(Icons.chat),
-            label: 'Chatbot',
-          ),
-          BottomNavigationBarItem(
-            icon: Icon(Icons.school),
-            label: 'Academics',
-          ),
-          BottomNavigationBarItem(
-            icon: Icon(Icons.announcement),
-            label: 'Announcements',
-          ),
-          BottomNavigationBarItem(
-            icon: Icon(Icons.person),
-            label: 'Profile',
-          ),
+              icon: Icon(Icons.announcement), label: 'Announcements'),
+          BottomNavigationBarItem(icon: Icon(Icons.person), label: 'Profile'),
         ],
         currentIndex: _selectedIndex,
         selectedItemColor: Theme.of(context).primaryColor,
@@ -135,7 +137,6 @@ class HomeContent extends StatelessWidget {
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
       child: InkWell(
         onTap: () {
-          // Handle navigation or action for each feature
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(content: Text('You tapped on $title')),
           );

@@ -19,6 +19,7 @@ class MyApp extends StatefulWidget {
 class MyAppState extends State<MyApp> {
   static const storage = FlutterSecureStorage();
   String? jwtToken;
+  bool isLoading = true; // ✅ Used to control splash screen loading
 
   @override
   void initState() {
@@ -27,11 +28,14 @@ class MyAppState extends State<MyApp> {
   }
 
   Future<void> _checkAuthentication() async {
-    // Read the JWT token from secure storage
+    await Future.delayed(
+        const Duration(seconds: 2)); // ✅ Simulating splash delay
     String? token = await storage.read(key: "jwt_token");
     debugPrint("JWT Token from storage: $token");
+
     setState(() {
       jwtToken = token;
+      isLoading = false; // ✅ Stop showing splash
     });
   }
 
@@ -50,22 +54,22 @@ class MyAppState extends State<MyApp> {
         elevatedButtonTheme: ElevatedButtonThemeData(
           style: ElevatedButton.styleFrom(
             foregroundColor: Colors.white,
-            backgroundColor: const Color.fromARGB(255, 86, 97, 96),
+            backgroundColor: const Color(0xFF566160),
           ),
         ),
       ),
       debugShowCheckedModeBanner: false,
-      // Set initial route based on whether a JWT token exists
-      initialRoute: jwtToken == null ? '/' : '/home',
+      home: isLoading
+          ? const SplashScreen() // ✅ Show splash while loading
+          : (jwtToken == null
+              ? const LoginScreen()
+              : const HomeScreen(userName: "User")), // ✅ Check login state
       routes: {
-        '/': (context) => const SplashScreen(),
         '/login': (context) => const LoginScreen(),
         '/signup': (context) => const SignUpScreen(),
-        // Handle /home route with a fallback userName
         '/home': (context) {
-          // Check for arguments passed during navigation (optional)
           final String userName =
-              ModalRoute.of(context)?.settings.arguments as String? ?? '';
+              ModalRoute.of(context)?.settings.arguments as String? ?? "User";
           debugPrint("Building HomeScreen with userName: $userName");
           return HomeScreen(userName: userName);
         },
