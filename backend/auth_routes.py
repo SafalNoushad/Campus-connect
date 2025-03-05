@@ -87,19 +87,20 @@ def signup():
 
 @auth_bp.route('/login', methods=['POST'])
 def login():
-    """Handles user login and authenticates against the database."""
+    """Handles user login and authentication."""
     try:
         data = request.json
         admission_number = data.get("admission_number")
         password = data.get("password")
 
-        if not all([admission_number, password]):
+        if not admission_number or not password:
             return jsonify({"error": "Missing admission number or password"}), 400
 
         db = get_db_connection()
-        cursor = db.cursor(dictionary=True)  # Use dictionary for easier JSON mapping
+        cursor = db.cursor(dictionary=True)
 
-        cursor.execute("SELECT admission_number, email, username, password, phone_number FROM users WHERE admission_number = %s", (admission_number,))
+        # ✅ Fetch only required fields
+        cursor.execute("SELECT admission_number, password, role FROM users WHERE admission_number = %s", (admission_number,))
         user = cursor.fetchone()
 
         cursor.close()
@@ -108,31 +109,25 @@ def login():
         if not user:
             return jsonify({"error": "Invalid admission number or password"}), 401
 
-        # Verify password
+        # ✅ Verify password using bcrypt
         if not bcrypt.checkpw(password.encode('utf-8'), user['password'].encode('utf-8')):
             return jsonify({"error": "Invalid admission number or password"}), 401
 
-        # Successful login
-        response_data = {
+        # ✅ Create JWT token
+        access_token = create_access_token(identity={"admission_number": user["admission_number"], "role": user["role"]})
+
+        return jsonify({
             "message": "Login successful",
             "user": {
-                "admission_number": user['admission_number'],
-                "email": user['email'],
-                "username": user['username'],
-                "phone_number": user['phone_number']
-            }
-        }
-        print(f"User {admission_number} logged in successfully")
-        return jsonify(response_data), 200
+                "admission_number": user["admission_number"],
+                "role": user["role"]
+            },
+            "token": access_token
+        }), 200
 
-    except mysql.connector.Error as db_err:
-        print(f"Database Error: {db_err}")
-        return jsonify({"error": "Database error", "details": str(db_err)}), 500
     except Exception as e:
-        print(f"Error: {e}")
+        print(f"❌ Error: {e}")
         return jsonify({"error": "Internal Server Error", "details": str(e)}), 500
-
-app.register_blueprint(auth_bp, url_prefix='/api/auth')
 
 if __name__ == '__main__':
     app.run(debug=True, host='0.0.0.0', port=5001)
