@@ -7,7 +7,7 @@ class NetworkConfig {
     } else if (Platform.isIOS) {
       return "http://localhost:5001"; // ✅ iOS Simulator
     } else {
-      return "http://192.168.1.181:5001"; // ✅ Change this to your local backend IP
+      return "http://192.168.1.7:5001"; // ✅ Change this to your local backend IP
     }
   }
 }
