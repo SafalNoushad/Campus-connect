@@ -16,8 +16,7 @@ class _ProfilePageState extends State<ProfilePage> {
   String email = "";
   String phone = "";
   String name = "User";
-  String department = "Unknown";
-  String location = "Unknown";
+  String department = "";
   String profileImagePath = ""; // ✅ Path to profile image
 
   final TextEditingController nameController = TextEditingController();
@@ -39,7 +38,6 @@ class _ProfilePageState extends State<ProfilePage> {
       phone = prefs.getString('phone') ?? "N/A";
       name = prefs.getString('name') ?? "User";
       department = prefs.getString('department') ?? "Unknown";
-      location = prefs.getString('location') ?? "Unknown";
       profileImagePath = prefs.getString('profile_image') ?? "";
     });
 
@@ -85,48 +83,42 @@ class _ProfilePageState extends State<ProfilePage> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(
-        title: const Text('Profile'),
-        backgroundColor: Theme.of(context).primaryColor,
-      ),
-      body: SingleChildScrollView(
-        child: Column(
-          children: [
-            const SizedBox(height: 20),
-            GestureDetector(
-              onTap: _pickProfileImage, // ✅ Upload profile picture
-              child: CircleAvatar(
-                radius: 50,
-                backgroundImage: profileImagePath.isNotEmpty
-                    ? FileImage(File(profileImagePath)) as ImageProvider
-                    : const AssetImage('assets/default_profile.png'),
-                child: Align(
-                  alignment: Alignment.bottomRight,
-                  child: CircleAvatar(
-                    backgroundColor: Colors.white,
-                    radius: 15,
-                    child: Icon(Icons.camera_alt,
-                        color: Theme.of(context).primaryColor, size: 20),
-                  ),
+    return SingleChildScrollView(
+      child: Column(
+        children: [
+          const SizedBox(height: 20),
+          GestureDetector(
+            onTap: _pickProfileImage, // ✅ Upload profile picture
+            child: CircleAvatar(
+              radius: 50,
+              backgroundImage: profileImagePath.isNotEmpty
+                  ? FileImage(File(profileImagePath)) as ImageProvider
+                  : const AssetImage('assets/default_profile.png'),
+              child: Align(
+                alignment: Alignment.bottomRight,
+                child: CircleAvatar(
+                  backgroundColor: Colors.white,
+                  radius: 15,
+                  child: Icon(Icons.camera_alt,
+                      color: Theme.of(context).primaryColor, size: 20),
                 ),
               ),
             ),
-            const SizedBox(height: 10),
-            Text(
-              name,
-              style: const TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
-            ),
-            Text(
-              '$department - ${role.toUpperCase()}',
-              style: const TextStyle(fontSize: 16, color: Colors.grey),
-            ),
-            const SizedBox(height: 20),
-            _buildInfoCard(),
-            const SizedBox(height: 20),
-            _buildActionButtons(),
-          ],
-        ),
+          ),
+          const SizedBox(height: 10),
+          Text(
+            name,
+            style: const TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
+          ),
+          Text(
+            '$department - ${role.toUpperCase()}',
+            style: const TextStyle(fontSize: 16, color: Colors.grey),
+          ),
+          const SizedBox(height: 20),
+          _buildInfoCard(),
+          const SizedBox(height: 20),
+          _buildActionButtons(),
+        ],
       ),
     );
   }
@@ -141,8 +133,6 @@ class _ProfilePageState extends State<ProfilePage> {
             _buildInfoRow(Icons.email, email),
             const Divider(),
             _buildInfoRow(Icons.phone, phone),
-            const Divider(),
-            _buildInfoRow(Icons.location_on, location),
             const Divider(),
             _buildInfoRow(Icons.school, 'Admission No: $admissionNumber'),
           ],
@@ -171,6 +161,7 @@ class _ProfilePageState extends State<ProfilePage> {
           onPressed: _showEditProfileDialog, // ✅ Edit details
           style: ElevatedButton.styleFrom(
             backgroundColor: Theme.of(context).primaryColor,
+            foregroundColor: Colors.white, // ✅ Text color set to white
             minimumSize: const Size(200, 40),
           ),
           child: const Text('Edit Profile'),
@@ -180,6 +171,7 @@ class _ProfilePageState extends State<ProfilePage> {
           onPressed: _logout, // ✅ Logout function
           style: ElevatedButton.styleFrom(
             backgroundColor: Colors.red,
+            foregroundColor: Colors.white, // ✅ Text color set to white
             minimumSize: const Size(200, 40),
           ),
           child: const Text('Logout'),

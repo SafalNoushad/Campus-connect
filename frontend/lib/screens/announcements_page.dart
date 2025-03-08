@@ -5,50 +5,44 @@ class AnnouncementsPage extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(
-        title: const Text('Announcements'),
-        backgroundColor: Theme.of(context).primaryColor,
-      ),
-      body: ListView(
-        children: [
-          _buildAnnouncement(
-            context,
-            'Campus Closure',
-            'The campus will be closed on May 25th for maintenance.',
-            Icons.warning,
-            Colors.red,
-          ),
-          _buildAnnouncement(
-            context,
-            'New Course Offerings',
-            'Registration for fall semester courses is now open.',
-            Icons.school,
-            Colors.blue,
-          ),
-          _buildAnnouncement(
-            context,
-            'Student Council Elections',
-            'Vote for your student representatives on June 1st.',
-            Icons.how_to_vote,
-            Colors.green,
-          ),
-          _buildAnnouncement(
-            context,
-            'Library Hours Extended',
-            'The library will now be open until midnight during exam week.',
-            Icons.access_time,
-            Colors.orange,
-          ),
-          _buildAnnouncement(
-            context,
-            'Career Fair',
-            'Don\'t miss the annual career fair on July 10th in the main hall.',
-            Icons.work,
-            Colors.purple,
-          ),
-        ],
-      ),
+    return ListView(
+      children: [
+        _buildAnnouncement(
+          context,
+          'Campus Closure',
+          'The campus will be closed on May 25th for maintenance.',
+          Icons.warning,
+          Colors.red,
+        ),
+        _buildAnnouncement(
+          context,
+          'New Course Offerings',
+          'Registration for fall semester courses is now open.',
+          Icons.school,
+          Colors.blue,
+        ),
+        _buildAnnouncement(
+          context,
+          'Student Council Elections',
+          'Vote for your student representatives on June 1st.',
+          Icons.how_to_vote,
+          Colors.green,
+        ),
+        _buildAnnouncement(
+          context,
+          'Library Hours Extended',
+          'The library will now be open until midnight during exam week.',
+          Icons.access_time,
+          Colors.orange,
+        ),
+        _buildAnnouncement(
+          context,
+          'Career Fair',
+          'Don\'t miss the annual career fair on July 10th in the main hall.',
+          Icons.work,
+          Colors.purple,
+        ),
+      ],
     );
   }
 

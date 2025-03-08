@@ -34,49 +34,43 @@ class _ChatbotPageState extends State<ChatbotPage> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(
-        title: const Text("Chatbot"),
-        backgroundColor: Theme.of(context).primaryColor,
-      ),
-      body: Column(
-        children: [
-          Expanded(
-            child: ListView.builder(
-              reverse: true, // Makes new messages appear at the bottom
-              padding: const EdgeInsets.all(10),
-              itemCount: _messages.length,
-              itemBuilder: (context, index) {
-                final message = _messages[_messages.length - 1 - index];
-                return Align(
-                  alignment: message["sender"] == "user"
-                      ? Alignment.centerRight
-                      : Alignment.centerLeft,
-                  child: Container(
-                    margin: const EdgeInsets.symmetric(vertical: 5),
-                    padding: const EdgeInsets.all(12),
-                    decoration: BoxDecoration(
+    return Column(
+      children: [
+        Expanded(
+          child: ListView.builder(
+            reverse: true, // Makes new messages appear at the bottom
+            padding: const EdgeInsets.all(10),
+            itemCount: _messages.length,
+            itemBuilder: (context, index) {
+              final message = _messages[_messages.length - 1 - index];
+              return Align(
+                alignment: message["sender"] == "user"
+                    ? Alignment.centerRight
+                    : Alignment.centerLeft,
+                child: Container(
+                  margin: const EdgeInsets.symmetric(vertical: 5),
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: message["sender"] == "user"
+                        ? Theme.of(context).primaryColor
+                        : Colors.grey[300],
+                    borderRadius: BorderRadius.circular(16),
+                  ),
+                  child: Text(
+                    message["text"]!,
+                    style: TextStyle(
                       color: message["sender"] == "user"
-                          ? Theme.of(context).primaryColor
-                          : Colors.grey[300],
-                      borderRadius: BorderRadius.circular(16),
-                    ),
-                    child: Text(
-                      message["text"]!,
-                      style: TextStyle(
-                        color: message["sender"] == "user"
-                            ? Colors.white
-                            : Colors.black,
-                      ),
+                          ? Colors.white
+                          : Colors.black,
                     ),
                   ),
-                );
-              },
-            ),
+                ),
+              );
+            },
           ),
-          _buildInputField(),
-        ],
-      ),
+        ),
+        _buildInputField(),
+      ],
     );
   }
 

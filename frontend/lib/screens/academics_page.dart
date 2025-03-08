@@ -5,37 +5,31 @@ class AcademicsPage extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(
-        title: const Text('Academics'),
-        backgroundColor: Theme.of(context).primaryColor,
-      ),
-      body: ListView(
-        children: [
-          _buildSection(context, 'Courses', Icons.book, [
-            'Mathematics',
-            'Physics',
-            'Computer Science',
-            'Literature',
-          ]),
-          _buildSection(context, 'Assignments', Icons.assignment, [
-            'Math Homework - Due 05/15',
-            'Physics Lab Report - Due 05/18',
-            'CS Project - Due 05/20',
-            'Literature Essay - Due 05/22',
-          ]),
-          _buildSection(context, 'Exams', Icons.event, [
-            'Midterm Exams - 06/01 to 06/05',
-            'Final Exams - 07/15 to 07/20',
-          ]),
-          _buildSection(context, 'Resources', Icons.folder, [
-            'Online Library',
-            'Study Groups',
-            'Tutoring Services',
-            'Academic Calendar',
-          ]),
-        ],
-      ),
+    return ListView(
+      children: [
+        _buildSection(context, 'Courses', Icons.book, [
+          'Mathematics',
+          'Physics',
+          'Computer Science',
+          'Literature',
+        ]),
+        _buildSection(context, 'Assignments', Icons.assignment, [
+          'Math Homework - Due 05/15',
+          'Physics Lab Report - Due 05/18',
+          'CS Project - Due 05/20',
+          'Literature Essay - Due 05/22',
+        ]),
+        _buildSection(context, 'Exams', Icons.event, [
+          'Midterm Exams - 06/01 to 06/05',
+          'Final Exams - 07/15 to 07/20',
+        ]),
+        _buildSection(context, 'Resources', Icons.folder, [
+          'Online Library',
+          'Study Groups',
+          'Tutoring Services',
+          'Academic Calendar',
+        ]),
+      ],
     );
   }
 

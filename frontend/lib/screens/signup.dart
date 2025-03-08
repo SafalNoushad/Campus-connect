@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
+import '../utils/network_config.dart';
 
 class SignUpScreen extends StatefulWidget {
   const SignUpScreen({super.key});
@@ -35,6 +36,11 @@ class SignUpScreenState extends State<SignUpScreen>
   @override
   void dispose() {
     _animationController.dispose();
+    emailController.clear();
+    usernameController.clear();
+    passwordController.clear();
+    phoneNumberController.clear();
+
     emailController.dispose();
     usernameController.dispose();
     passwordController.dispose();
@@ -43,34 +49,40 @@ class SignUpScreenState extends State<SignUpScreen>
   }
 
   void _showMessage(String message, Color color) {
-    final snackBar = SnackBar(
-      content: Text(message),
-      duration: const Duration(seconds: 2),
-      backgroundColor: color,
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(message),
+        duration: const Duration(seconds: 2),
+        backgroundColor: color,
+      ),
     );
-    ScaffoldMessenger.of(context).showSnackBar(snackBar);
   }
 
   Future<void> _onSignUp() async {
     if (_formKey.currentState!.validate()) {
-      final String email = emailController.text;
-      final String admissionNumber = email.split('@')[0]; // Derive from email
-      final String username = usernameController.text;
-      final String password = passwordController.text;
-      final String phoneNumber = phoneNumberController.text;
+      final String email = emailController.text.trim();
+      final String username = usernameController.text.trim();
+      final String password = passwordController.text.trim();
+      final String phoneNumber = phoneNumberController.text.trim();
+
+      if (!email.contains('@')) {
+        _showMessage("Invalid email format", Colors.red);
+        return;
+      }
+      final String admissionNumber = email.split('@')[0];
 
       print(
-          "Sending signup request: admission_number=$admissionNumber, email=$email, username=$username, password=$password, phone=$phoneNumber");
+          "Sending signup request: admission_number=$admissionNumber, email=$email, name=$username, password=$password, phone_number=$phoneNumber");
 
       try {
+        final String baseUrl = NetworkConfig.getBaseUrl();
         final response = await http.post(
-          Uri.parse(
-              "http://192.168.1.181:5001/api/auth/signup"), // Emulator URL
+          Uri.parse("$baseUrl/api/auth/signup"),
           headers: {"Content-Type": "application/json"},
           body: jsonEncode({
             "admission_number": admissionNumber,
             "email": email,
-            "username": username,
+            "name": username,
             "password": password,
             "phone_number": phoneNumber,
           }),
@@ -81,20 +93,24 @@ class SignUpScreenState extends State<SignUpScreen>
 
         if (response.statusCode == 201) {
           _showMessage("Signup Successful!", Colors.green);
-          // Redirect to login page after successful signup
           Future.delayed(const Duration(seconds: 2), () {
             print("Redirecting to login");
-            Navigator.of(context).pushReplacementNamed('/login');
+            Navigator.pushReplacementNamed(context, '/login');
           });
         } else {
-          final responseData = jsonDecode(response.body);
-          String errorMessage =
-              responseData['error'] ?? 'Signup failed. Please try again.';
-          _showMessage(errorMessage, Colors.red);
+          try {
+            final responseData = jsonDecode(response.body);
+            String errorMessage =
+                responseData['error'] ?? 'Signup failed. Please try again.';
+            _showMessage(errorMessage, Colors.red);
+          } catch (_) {
+            _showMessage(
+                "Unexpected server response. Please try again.", Colors.red);
+          }
         }
       } catch (e) {
         print("Signup exception: $e");
-        _showMessage("Signup Failed: $e", Colors.red);
+        _showMessage("Signup Failed: Network error", Colors.red);
       }
     } else {
       print("Form validation failed");
@@ -138,7 +154,8 @@ class SignUpScreenState extends State<SignUpScreen>
                         if (value == null || value.isEmpty) {
                           return 'Please enter your email';
                         }
-                        if (!value.contains('@')) {
+                        if (!RegExp(r'^[\w\.-]+@[\w\.-]+\.\w+$')
+                            .hasMatch(value)) {
                           return 'Please enter a valid email';
                         }
                         return null;
@@ -172,6 +189,14 @@ class SignUpScreenState extends State<SignUpScreen>
                         if (value == null || value.isEmpty) {
                           return 'Please enter your password';
                         }
+                        if (value.length < 6) {
+                          return 'Password must be at least 6 characters';
+                        }
+                        if (!RegExp(
+                                r'^(?=.*[A-Za-z])(?=.*\d)[A-Za-z\d@$!%*?&]{6,}$')
+                            .hasMatch(value)) {
+                          return 'Password must contain letters, numbers & special chars';
+                        }
                         return null;
                       },
                     ),
@@ -186,6 +211,9 @@ class SignUpScreenState extends State<SignUpScreen>
                       validator: (value) {
                         if (value == null || value.isEmpty) {
                           return 'Please enter your phone number';
+                        }
+                        if (!RegExp(r'^\d{10,}$').hasMatch(value)) {
+                          return 'Enter a valid phone number';
                         }
                         return null;
                       },

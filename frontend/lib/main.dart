@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:flutter_secure_storage/flutter_secure_storage.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'screens/splash.dart';
 import 'screens/login.dart';
 import 'screens/signup.dart';
@@ -17,26 +17,37 @@ class MyApp extends StatefulWidget {
 }
 
 class MyAppState extends State<MyApp> {
-  static const storage = FlutterSecureStorage();
+  bool isLoading = true;
   String? jwtToken;
-  bool isLoading = true; // ✅ Used to control splash screen loading
+  Map<String, String> userData = {};
 
   @override
   void initState() {
     super.initState();
-    _checkAuthentication();
+    _loadUserData();
   }
 
-  Future<void> _checkAuthentication() async {
-    await Future.delayed(
-        const Duration(seconds: 2)); // ✅ Simulating splash delay
-    String? token = await storage.read(key: "jwt_token");
-    debugPrint("JWT Token from storage: $token");
+  Future<void> _loadUserData() async {
+    SharedPreferences prefs = await SharedPreferences.getInstance();
+
+    // Simulate a delay to ensure SplashScreen is visible
+    await Future.delayed(const Duration(seconds: 2));
 
     setState(() {
-      jwtToken = token;
-      isLoading = false; // ✅ Stop showing splash
+      jwtToken = prefs.getString('jwtToken');
+      userData = {
+        "name": prefs.getString('name') ?? "Guest",
+        "email": prefs.getString('email') ?? "N/A",
+        "phone": prefs.getString('phone') ?? "N/A",
+        "admission_number": prefs.getString('admission_number') ?? "N/A",
+        "role": prefs.getString('role') ?? "N/A",
+        "department": prefs.getString('department') ?? "N/A",
+        "location": prefs.getString('location') ?? "N/A",
+      };
+      isLoading = false;
     });
+
+    debugPrint("✅ Loaded User Data: $userData");
   }
 
   @override
@@ -47,32 +58,19 @@ class MyAppState extends State<MyApp> {
         primaryColor: const Color(0xFF0C6170),
         hintColor: const Color(0xFF37BEB0),
         scaffoldBackgroundColor: const Color(0xFFDBF5F0),
-        textTheme: const TextTheme(
-          bodyLarge: TextStyle(color: Color(0xFF0C6170)),
-          bodyMedium: TextStyle(color: Color(0xFF0C6170)),
-        ),
-        elevatedButtonTheme: ElevatedButtonThemeData(
-          style: ElevatedButton.styleFrom(
-            foregroundColor: Colors.white,
-            backgroundColor: const Color(0xFF566160),
-          ),
-        ),
       ),
       debugShowCheckedModeBanner: false,
       home: isLoading
-          ? const SplashScreen() // ✅ Show splash while loading
-          : (jwtToken == null
-              ? const LoginScreen()
-              : const HomeScreen(userName: "User")), // ✅ Check login state
+          ? const SplashScreen()
+          : const LoginScreen(), // Always go to LoginScreen after splash
       routes: {
         '/login': (context) => const LoginScreen(),
         '/signup': (context) => const SignUpScreen(),
-        '/home': (context) {
-          final String userName =
-              ModalRoute.of(context)?.settings.arguments as String? ?? "User";
-          debugPrint("Building HomeScreen with userName: $userName");
-          return HomeScreen(userName: userName);
-        },
+        '/home': (context) => HomeScreen(
+              userData: (ModalRoute.of(context)?.settings.arguments
+                      as Map<String, String>?) ??
+                  {"name": "Guest"},
+            ),
       },
     );
   }
