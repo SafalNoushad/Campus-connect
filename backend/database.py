@@ -1,21 +1,13 @@
-import mysql.connector
-import os
-from dotenv import load_dotenv
+from flask_sqlalchemy import SQLAlchemy #type:ignore
+from flask_migrate import Migrate   #type:ignore
+from sqlalchemy import create_engine    #type:ignore
 
-# Load environment variables
-load_dotenv()
-
-def get_db_connection():
-    """Establish and return a database connection."""
-    try:
-        db = mysql.connector.connect(
-            host=os.getenv("MYSQL_HOST"),
-            user=os.getenv("MYSQL_USER"),
-            password=os.getenv("MYSQL_PASSWORD"),
-            database=os.getenv("MYSQL_DB"),
-            autocommit=True  # ✅ Improves performance by auto-committing transactions
-        )
-        return db
-    except mysql.connector.Error as err:
-        print(f"❌ Database Connection Error: {err}")
-        raise
+db = SQLAlchemy()
+migrate = Migrate() 
+try:
+    engine = create_engine("mysql+pymysql://root:Eva%400305@localhost/campus_connect")
+    conn = engine.connect()
+    print("Database connection successful!")
+    conn.close()
+except Exception as e:
+    print("Database Connection Error:", e)
