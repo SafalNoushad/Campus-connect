@@ -4,6 +4,8 @@ import 'screens/splash.dart';
 import 'screens/login.dart';
 import 'screens/signup.dart';
 import 'screens/home.dart';
+import 'screens/chatbot_page.dart';
+import 'screens/admin_dashboard.dart';
 
 void main() {
   runApp(const MyApp());
@@ -30,19 +32,16 @@ class MyAppState extends State<MyApp> {
   Future<void> _loadUserData() async {
     SharedPreferences prefs = await SharedPreferences.getInstance();
 
-    // Simulate a delay to ensure SplashScreen is visible
     await Future.delayed(const Duration(seconds: 2));
 
     setState(() {
-      jwtToken = prefs.getString('jwtToken');
+      jwtToken = prefs.getString('jwt_token'); // Updated key
       userData = {
         "name": prefs.getString('name') ?? "Guest",
         "email": prefs.getString('email') ?? "N/A",
         "phone": prefs.getString('phone') ?? "N/A",
         "admission_number": prefs.getString('admission_number') ?? "N/A",
         "role": prefs.getString('role') ?? "N/A",
-        "department": prefs.getString('department') ?? "N/A",
-        "location": prefs.getString('location') ?? "N/A",
       };
       isLoading = false;
     });
@@ -62,15 +61,20 @@ class MyAppState extends State<MyApp> {
       debugShowCheckedModeBanner: false,
       home: isLoading
           ? const SplashScreen()
-          : const LoginScreen(), // Always go to LoginScreen after splash
+          : jwtToken == null
+              ? LoginScreen()
+              : userData['role'] == 'admin'
+                  ? AdminDashboard()
+                  : HomeScreen(userData: userData),
       routes: {
-        '/login': (context) => const LoginScreen(),
+        '/login': (context) => LoginScreen(),
         '/signup': (context) => const SignUpScreen(),
         '/home': (context) => HomeScreen(
               userData: (ModalRoute.of(context)?.settings.arguments
                       as Map<String, String>?) ??
                   {"name": "Guest"},
             ),
+        '/chatbot': (context) => ChatbotPage(),
       },
     );
   }

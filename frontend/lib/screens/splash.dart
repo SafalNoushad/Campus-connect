@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+import 'admin_dashboard.dart'; // ✅ Import Admin Dashboard
 
 class SplashScreen extends StatefulWidget {
   const SplashScreen({super.key});
@@ -29,9 +31,29 @@ class SplashScreenState extends State<SplashScreen>
 
     _controller.forward();
 
-    Future.delayed(const Duration(seconds: 3), () {
-      Navigator.of(context).pushReplacementNamed('/login');
-    });
+    _navigateToNextScreen();
+  }
+
+  Future<void> _navigateToNextScreen() async {
+    SharedPreferences prefs = await SharedPreferences.getInstance();
+    String? role = prefs.getString('role');
+
+    // ✅ Debugging: Print role to check stored value
+    print("User Role from SharedPreferences: $role");
+
+    await Future.delayed(const Duration(seconds: 3)); // Ensure animation plays
+
+    if (mounted) {
+      if (role == 'admin') {
+        print("✅ Redirecting to Admin Dashboard");
+        Navigator.of(context).pushReplacement(
+          MaterialPageRoute(builder: (context) => AdminDashboard()),
+        );
+      } else {
+        print("✅ Redirecting to Login Page");
+        Navigator.of(context).pushReplacementNamed('/login');
+      }
+    }
   }
 
   @override

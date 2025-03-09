@@ -1,0 +1,2460 @@
+frontend/lib/admin_screens/academics_page.dart:
+
+contents:
+import 'package:flutter/material.dart';
+
+class AcademicsPage extends StatelessWidget {
+  const AcademicsPage({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    return ListView(
+      children: [
+        _buildSection(context, 'Courses', Icons.book, [
+          'Mathematics',
+          'Physics',
+          'Computer Science',
+          'Literature',
+        ]),
+        _buildSection(context, 'Assignments', Icons.assignment, [
+          'Math Homework - Due 05/15',
+          'Physics Lab Report - Due 05/18',
+          'CS Project - Due 05/20',
+          'Literature Essay - Due 05/22',
+        ]),
+        _buildSection(context, 'Exams', Icons.event, [
+          'Midterm Exams - 06/01 to 06/05',
+          'Final Exams - 07/15 to 07/20',
+        ]),
+        _buildSection(context, 'Resources', Icons.folder, [
+          'Online Library',
+          'Study Groups',
+          'Tutoring Services',
+          'Academic Calendar',
+        ]),
+      ],
+    );
+  }
+
+  Widget _buildSection(
+      BuildContext context, String title, IconData icon, List<String> items) {
+    return Card(
+      margin: const EdgeInsets.all(8.0),
+      child: ExpansionTile(
+        leading: Icon(icon, color: Theme.of(context).primaryColor),
+        title: Text(title, style: const TextStyle(fontWeight: FontWeight.bold)),
+        children: items
+            .map((item) => ListTile(
+                  title: Text(item),
+                  onTap: () {
+                    // Handle item tap
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(content: Text('You tapped: $item')),
+                    );
+                  },
+                ))
+            .toList(),
+      ),
+    );
+  }
+}
+
+============================
+
+frontend/lib/admin_screens/announcements_page.dart:
+
+contents:
+import 'package:flutter/material.dart';
+
+class AnnouncementsPage extends StatelessWidget {
+  const AnnouncementsPage({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    return ListView(
+      children: [
+        _buildAnnouncement(
+          context,
+          'Campus Closure',
+          'The campus will be closed on May 25th for maintenance.',
+          Icons.warning,
+          Colors.red,
+        ),
+        _buildAnnouncement(
+          context,
+          'New Course Offerings',
+          'Registration for fall semester courses is now open.',
+          Icons.school,
+          Colors.blue,
+        ),
+        _buildAnnouncement(
+          context,
+          'Student Council Elections',
+          'Vote for your student representatives on June 1st.',
+          Icons.how_to_vote,
+          Colors.green,
+        ),
+        _buildAnnouncement(
+          context,
+          'Library Hours Extended',
+          'The library will now be open until midnight during exam week.',
+          Icons.access_time,
+          Colors.orange,
+        ),
+        _buildAnnouncement(
+          context,
+          'Career Fair',
+          'Don\'t miss the annual career fair on July 10th in the main hall.',
+          Icons.work,
+          Colors.purple,
+        ),
+      ],
+    );
+  }
+
+  Widget _buildAnnouncement(BuildContext context, String title,
+      String description, IconData icon, Color color) {
+    return Card(
+      margin: const EdgeInsets.symmetric(horizontal: 8.0, vertical: 4.0),
+      child: ListTile(
+        leading: CircleAvatar(
+          backgroundColor: color,
+          child: Icon(icon, color: Colors.white),
+        ),
+        title: Text(title, style: const TextStyle(fontWeight: FontWeight.bold)),
+        subtitle: Text(description),
+        onTap: () {
+          // Show full announcement details
+          showDialog(
+            context: context,
+            builder: (BuildContext context) {
+              return AlertDialog(
+                title: Text(title),
+                content: Text(description),
+                actions: [
+                  TextButton(
+                    child: const Text('Close'),
+                    onPressed: () => Navigator.of(context).pop(),
+                  ),
+                ],
+              );
+            },
+          );
+        },
+      ),
+    );
+  }
+}
+
+============================
+
+frontend/lib/admin_screens/profile_page.dart:
+
+contents:
+import 'package:flutter/material.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+import 'package:image_picker/image_picker.dart';
+import 'dart:io';
+
+class ProfilePage extends StatefulWidget {
+  const ProfilePage({super.key});
+
+  @override
+  State<ProfilePage> createState() => _ProfilePageState();
+}
+
+class _ProfilePageState extends State<ProfilePage> {
+  String admissionNumber = "";
+  String role = "";
+  String email = "";
+  String phone = "";
+  String name = "User";
+  String department = "";
+  String profileImagePath = ""; // ✅ Path to profile image
+
+  final TextEditingController nameController = TextEditingController();
+  final TextEditingController emailController = TextEditingController();
+  final TextEditingController phoneController = TextEditingController();
+
+  @override
+  void initState() {
+    super.initState();
+    _loadUserData();
+  }
+
+  Future<void> _loadUserData() async {
+    SharedPreferences prefs = await SharedPreferences.getInstance();
+    setState(() {
+      admissionNumber = prefs.getString('admission_number') ?? "N/A";
+      role = prefs.getString('role') ?? "N/A";
+      email = prefs.getString('email') ?? "N/A";
+      phone = prefs.getString('phone') ?? "N/A";
+      name = prefs.getString('name') ?? "User";
+      department = prefs.getString('department') ?? "Unknown";
+      profileImagePath = prefs.getString('profile_image') ?? "";
+    });
+
+    nameController.text = name;
+    emailController.text = email;
+    phoneController.text = phone;
+  }
+
+  Future<void> _updateUserData() async {
+    SharedPreferences prefs = await SharedPreferences.getInstance();
+    await prefs.setString('name', nameController.text);
+    await prefs.setString('email', emailController.text);
+    await prefs.setString('phone', phoneController.text);
+
+    setState(() {
+      name = nameController.text;
+      email = emailController.text;
+      phone = phoneController.text;
+    });
+
+    Navigator.pop(context);
+  }
+
+  Future<void> _logout() async {
+    SharedPreferences prefs = await SharedPreferences.getInstance();
+    await prefs.clear(); // ✅ Clear saved user data
+    Navigator.of(context).pushReplacementNamed('/login');
+  }
+
+  Future<void> _pickProfileImage() async {
+    final ImagePicker picker = ImagePicker();
+    final XFile? image = await picker.pickImage(source: ImageSource.gallery);
+
+    if (image != null) {
+      SharedPreferences prefs = await SharedPreferences.getInstance();
+      await prefs.setString('profile_image', image.path);
+
+      setState(() {
+        profileImagePath = image.path;
+      });
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return SingleChildScrollView(
+      child: Column(
+        children: [
+          const SizedBox(height: 20),
+          GestureDetector(
+            onTap: _pickProfileImage, // ✅ Upload profile picture
+            child: CircleAvatar(
+              radius: 50,
+              backgroundImage: profileImagePath.isNotEmpty
+                  ? FileImage(File(profileImagePath)) as ImageProvider
+                  : const AssetImage('assets/default_profile.png'),
+              child: Align(
+                alignment: Alignment.bottomRight,
+                child: CircleAvatar(
+                  backgroundColor: Colors.white,
+                  radius: 15,
+                  child: Icon(Icons.camera_alt,
+                      color: Theme.of(context).primaryColor, size: 20),
+                ),
+              ),
+            ),
+          ),
+          const SizedBox(height: 10),
+          Text(
+            name,
+            style: const TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
+          ),
+          Text(
+            '$department - ${role.toUpperCase()}',
+            style: const TextStyle(fontSize: 16, color: Colors.grey),
+          ),
+          const SizedBox(height: 20),
+          _buildInfoCard(),
+          const SizedBox(height: 20),
+          _buildActionButtons(),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildInfoCard() {
+    return Card(
+      margin: const EdgeInsets.symmetric(horizontal: 16.0),
+      child: Padding(
+        padding: const EdgeInsets.all(16.0),
+        child: Column(
+          children: [
+            _buildInfoRow(Icons.email, email),
+            const Divider(),
+            _buildInfoRow(Icons.phone, phone),
+            const Divider(),
+            _buildInfoRow(Icons.school, 'Admission No: $admissionNumber'),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildInfoRow(IconData icon, String text) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 8.0),
+      child: Row(
+        children: [
+          Icon(icon, color: Colors.grey),
+          const SizedBox(width: 10),
+          Text(text),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildActionButtons() {
+    return Column(
+      children: [
+        ElevatedButton(
+          onPressed: _showEditProfileDialog, // ✅ Edit details
+          style: ElevatedButton.styleFrom(
+            backgroundColor: Theme.of(context).primaryColor,
+            foregroundColor: Colors.white, // ✅ Text color set to white
+            minimumSize: const Size(200, 40),
+          ),
+          child: const Text('Edit Profile'),
+        ),
+        const SizedBox(height: 10),
+        ElevatedButton(
+          onPressed: _logout, // ✅ Logout function
+          style: ElevatedButton.styleFrom(
+            backgroundColor: Colors.red,
+            foregroundColor: Colors.white, // ✅ Text color set to white
+            minimumSize: const Size(200, 40),
+          ),
+          child: const Text('Logout'),
+        ),
+      ],
+    );
+  }
+
+  void _showEditProfileDialog() {
+    showDialog(
+      context: context,
+      builder: (context) {
+        return AlertDialog(
+          title: const Text("Edit Profile"),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              TextFormField(
+                controller: nameController,
+                decoration: const InputDecoration(labelText: "Name"),
+              ),
+              const SizedBox(height: 10),
+              TextFormField(
+                controller: emailController,
+                decoration: const InputDecoration(labelText: "Email"),
+              ),
+              const SizedBox(height: 10),
+              TextFormField(
+                controller: phoneController,
+                decoration: const InputDecoration(labelText: "Phone"),
+              ),
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text("Cancel"),
+            ),
+            ElevatedButton(
+              onPressed: _updateUserData, // ✅ Update data
+              child: const Text("Save"),
+            ),
+          ],
+        );
+      },
+    );
+  }
+}
+
+============================
+
+frontend/lib/main.dart:
+
+contents:
+import 'package:flutter/material.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+import 'screens/splash.dart';
+import 'screens/login.dart';
+import 'screens/signup.dart';
+import 'screens/home.dart';
+import 'screens/chatbot_page.dart'; // Import ChatbotPage
+
+void main() {
+  runApp(const MyApp());
+}
+
+class MyApp extends StatefulWidget {
+  const MyApp({super.key});
+
+  @override
+  MyAppState createState() => MyAppState();
+}
+
+class MyAppState extends State<MyApp> {
+  bool isLoading = true;
+  String? jwtToken;
+  Map<String, String> userData = {};
+
+  @override
+  void initState() {
+    super.initState();
+    _loadUserData();
+  }
+
+  Future<void> _loadUserData() async {
+    SharedPreferences prefs = await SharedPreferences.getInstance();
+
+    // Simulate a delay for splash screen
+    await Future.delayed(const Duration(seconds: 2));
+
+    setState(() {
+      jwtToken = prefs.getString('jwtToken');
+      userData = {
+        "name": prefs.getString('name') ?? "Guest",
+        "email": prefs.getString('email') ?? "N/A",
+        "phone": prefs.getString('phone') ?? "N/A",
+        "admission_number": prefs.getString('admission_number') ?? "N/A",
+        "role": prefs.getString('role') ?? "N/A",
+      };
+      isLoading = false;
+    });
+
+    debugPrint("✅ Loaded User Data: $userData");
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return MaterialApp(
+      title: 'Campus Connect',
+      theme: ThemeData(
+        primaryColor: const Color(0xFF0C6170),
+        hintColor: const Color(0xFF37BEB0),
+        scaffoldBackgroundColor: const Color(0xFFDBF5F0),
+      ),
+      debugShowCheckedModeBanner: false,
+      home: isLoading
+          ? const SplashScreen()
+          : jwtToken == null
+              ? LoginScreen()
+              : HomeScreen(userData: userData), // ✅ Pass userData
+
+      routes: {
+        '/login': (context) => LoginScreen(),
+        '/signup': (context) => const SignUpScreen(),
+        '/home': (context) => HomeScreen(
+              userData: (ModalRoute.of(context)?.settings.arguments
+                      as Map<String, String>?) ??
+                  {"name": "Guest"},
+            ),
+        '/chatbot': (context) => ChatbotPage(),
+      },
+    );
+  }
+}
+
+============================
+
+frontend/lib/screens/academics_page.dart:
+
+contents:
+import 'package:flutter/material.dart';
+
+class AcademicsPage extends StatelessWidget {
+  const AcademicsPage({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    return ListView(
+      children: [
+        _buildSection(context, 'Courses', Icons.book, [
+          'Mathematics',
+          'Physics',
+          'Computer Science',
+          'Literature',
+        ]),
+        _buildSection(context, 'Assignments', Icons.assignment, [
+          'Math Homework - Due 05/15',
+          'Physics Lab Report - Due 05/18',
+          'CS Project - Due 05/20',
+          'Literature Essay - Due 05/22',
+        ]),
+        _buildSection(context, 'Exams', Icons.event, [
+          'Midterm Exams - 06/01 to 06/05',
+          'Final Exams - 07/15 to 07/20',
+        ]),
+        _buildSection(context, 'Resources', Icons.folder, [
+          'Online Library',
+          'Study Groups',
+          'Tutoring Services',
+          'Academic Calendar',
+        ]),
+      ],
+    );
+  }
+
+  Widget _buildSection(
+      BuildContext context, String title, IconData icon, List<String> items) {
+    return Card(
+      margin: const EdgeInsets.all(8.0),
+      child: ExpansionTile(
+        leading: Icon(icon, color: Theme.of(context).primaryColor),
+        title: Text(title, style: const TextStyle(fontWeight: FontWeight.bold)),
+        children: items
+            .map((item) => ListTile(
+                  title: Text(item),
+                  onTap: () {
+                    // Handle item tap
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(content: Text('You tapped: $item')),
+                    );
+                  },
+                ))
+            .toList(),
+      ),
+    );
+  }
+}
+
+============================
+
+frontend/lib/screens/admin_dashboard.dart:
+
+contents:
+import 'package:flutter/material.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+import '../admin_screens/academics_page.dart';
+import '../admin_screens/announcements_page.dart';
+import '../admin_screens/profile_page.dart';
+import 'login.dart';
+import 'staffs_page.dart'; // New page for Staffs
+import 'students_page.dart'; // New page for Students
+
+class AdminDashboard extends StatefulWidget {
+  @override
+  AdminDashboardState createState() => AdminDashboardState();
+}
+
+class AdminDashboardState extends State<AdminDashboard> {
+  int _selectedIndex = 0;
+  Widget _selectedPage = DashboardPage();
+
+  void _onItemTapped(int index) {
+    setState(() {
+      _selectedIndex = index;
+      switch (index) {
+        case 0:
+          _selectedPage = DashboardPage();
+          break;
+        case 1:
+          _selectedPage = AcademicsPage();
+          break;
+        case 2:
+          _selectedPage = AnnouncementsPage();
+          break;
+        case 3:
+          _selectedPage = ProfilePage();
+          break;
+      }
+    });
+  }
+
+  Future<void> _logout() async {
+    SharedPreferences prefs = await SharedPreferences.getInstance();
+    await prefs.clear();
+    Navigator.pushReplacement(
+      context,
+      MaterialPageRoute(builder: (context) => LoginScreen()),
+    );
+  }
+
+  void _navigateToStaffs() {
+    setState(() {
+      _selectedPage = StaffsPage(); // Load StaffsPage when clicked
+    });
+    Navigator.pop(context); // Close the drawer after navigation
+  }
+
+  void _navigateToStudents() {
+    setState(() {
+      _selectedPage = StudentsPage(); // Load StudentsPage when clicked
+    });
+    Navigator.pop(context); // Close the drawer after navigation
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(
+        title: Text("Admin Dashboard"),
+        actions: [
+          IconButton(
+            icon: Icon(Icons.logout),
+            onPressed: _logout,
+          ),
+        ],
+      ),
+      drawer: Drawer(
+        child: ListView(
+          padding: EdgeInsets.zero,
+          children: [
+            DrawerHeader(
+              decoration: BoxDecoration(color: Colors.blue),
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Icon(Icons.admin_panel_settings,
+                      size: 50, color: Colors.white),
+                  SizedBox(height: 10),
+                  Text("Admin Panel",
+                      style: TextStyle(color: Colors.white, fontSize: 20)),
+                ],
+              ),
+            ),
+            ListTile(
+              leading: Icon(Icons.people),
+              title: Text("Staffs"),
+              onTap: _navigateToStaffs,
+            ),
+            ListTile(
+              leading: Icon(Icons.school),
+              title: Text("Students"),
+              onTap: _navigateToStudents,
+            ),
+          ],
+        ),
+      ),
+      body: _selectedPage, // Display the selected page dynamically
+      bottomNavigationBar: BottomNavigationBar(
+        currentIndex: _selectedIndex,
+        onTap: _onItemTapped,
+        selectedItemColor: Colors.blue,
+        unselectedItemColor: Colors.grey,
+        items: [
+          BottomNavigationBarItem(
+              icon: Icon(Icons.dashboard), label: 'Dashboard'),
+          BottomNavigationBarItem(icon: Icon(Icons.book), label: 'Academics'),
+          BottomNavigationBarItem(
+              icon: Icon(Icons.announcement), label: 'Announcements'),
+          BottomNavigationBarItem(icon: Icon(Icons.person), label: 'Profile'),
+        ],
+      ),
+    );
+  }
+}
+
+// Placeholder for Dashboard Page
+class DashboardPage extends StatelessWidget {
+  @override
+  Widget build(BuildContext context) {
+    return Center(
+      child: Text(
+        "Admin Dashboard",
+        style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold),
+      ),
+    );
+  }
+}
+
+============================
+
+frontend/lib/screens/announcements_page.dart:
+
+contents:
+import 'package:flutter/material.dart';
+
+class AnnouncementsPage extends StatelessWidget {
+  const AnnouncementsPage({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    return ListView(
+      children: [
+        _buildAnnouncement(
+          context,
+          'Campus Closure',
+          'The campus will be closed on May 25th for maintenance.',
+          Icons.warning,
+          Colors.red,
+        ),
+        _buildAnnouncement(
+          context,
+          'New Course Offerings',
+          'Registration for fall semester courses is now open.',
+          Icons.school,
+          Colors.blue,
+        ),
+        _buildAnnouncement(
+          context,
+          'Student Council Elections',
+          'Vote for your student representatives on June 1st.',
+          Icons.how_to_vote,
+          Colors.green,
+        ),
+        _buildAnnouncement(
+          context,
+          'Library Hours Extended',
+          'The library will now be open until midnight during exam week.',
+          Icons.access_time,
+          Colors.orange,
+        ),
+        _buildAnnouncement(
+          context,
+          'Career Fair',
+          'Don\'t miss the annual career fair on July 10th in the main hall.',
+          Icons.work,
+          Colors.purple,
+        ),
+      ],
+    );
+  }
+
+  Widget _buildAnnouncement(BuildContext context, String title,
+      String description, IconData icon, Color color) {
+    return Card(
+      margin: const EdgeInsets.symmetric(horizontal: 8.0, vertical: 4.0),
+      child: ListTile(
+        leading: CircleAvatar(
+          backgroundColor: color,
+          child: Icon(icon, color: Colors.white),
+        ),
+        title: Text(title, style: const TextStyle(fontWeight: FontWeight.bold)),
+        subtitle: Text(description),
+        onTap: () {
+          // Show full announcement details
+          showDialog(
+            context: context,
+            builder: (BuildContext context) {
+              return AlertDialog(
+                title: Text(title),
+                content: Text(description),
+                actions: [
+                  TextButton(
+                    child: const Text('Close'),
+                    onPressed: () => Navigator.of(context).pop(),
+                  ),
+                ],
+              );
+            },
+          );
+        },
+      ),
+    );
+  }
+}
+
+============================
+
+frontend/lib/screens/chatbot_page.dart:
+
+contents:
+import 'package:flutter/material.dart';
+import 'package:http/http.dart' as http;
+import 'dart:convert';
+import 'package:shared_preferences/shared_preferences.dart';
+import '../utils/network_config.dart';
+import 'package:file_picker/file_picker.dart';
+
+class ChatbotPage extends StatefulWidget {
+  const ChatbotPage({super.key});
+
+  @override
+  State<ChatbotPage> createState() => _ChatbotPageState();
+}
+
+class _ChatbotPageState extends State<ChatbotPage> {
+  final TextEditingController _messageController = TextEditingController();
+  final ScrollController _scrollController = ScrollController();
+  List<Map<String, dynamic>> _chatSessions = [];
+  List<Map<String, String>> _messages = [];
+  bool _isLoading = false;
+  int _selectedChatIndex = -1;
+  String _chatTitle = "New Chat";
+
+  @override
+  void initState() {
+    super.initState();
+    _loadChatHistory();
+  }
+
+  Future<void> _loadChatHistory() async {
+    final prefs = await SharedPreferences.getInstance();
+    final chatData = prefs.getString('chat_sessions');
+    if (chatData != null) {
+      setState(() {
+        _chatSessions = List<Map<String, dynamic>>.from(jsonDecode(chatData));
+        // Ensure messages are properly typed when loading
+        for (var session in _chatSessions) {
+          if (session['messages'] != null) {
+            session['messages'] = List<Map<String, String>>.from(
+                (session['messages'] as List)
+                    .map((msg) => Map<String, String>.from(msg)));
+          }
+        }
+        // Load the first chat if available
+        if (_chatSessions.isNotEmpty && _selectedChatIndex == -1) {
+          _selectedChatIndex = 0;
+          _chatTitle = _chatSessions[0]['name'] ?? "Chat 1";
+          _messages = List<Map<String, String>>.from(
+              _chatSessions[0]['messages'] ?? []);
+        }
+      });
+    }
+  }
+
+  Future<void> _saveChatHistory() async {
+    final prefs = await SharedPreferences.getInstance();
+    // Create a deep copy of chat sessions to ensure proper serialization
+    final sessionsToSave = _chatSessions.map((session) {
+      return {
+        'name': session['name'],
+        'messages': List<Map<String, String>>.from(session['messages'] ?? [])
+      };
+    }).toList();
+    await prefs.setString('chat_sessions', jsonEncode(sessionsToSave));
+  }
+
+  Future<void> _sendMessage() async {
+    String userMessage = _messageController.text.trim();
+    if (userMessage.isEmpty) return;
+
+    setState(() {
+      _messages.add({"sender": "user", "text": userMessage});
+      _isLoading = true;
+    });
+
+    _messageController.clear();
+    _scrollToBottom();
+
+    try {
+      final response = await http.post(
+        Uri.parse("${NetworkConfig.getBaseUrl()}/api/chat"),
+        headers: {"Content-Type": "application/json"},
+        body: jsonEncode({"message": userMessage}),
+      );
+
+      if (response.statusCode == 200) {
+        final responseData = jsonDecode(response.body);
+        setState(() {
+          _messages.add({"sender": "bot", "text": responseData["response"]});
+        });
+      } else {
+        setState(() {
+          _messages
+              .add({"sender": "bot", "text": "Error: Unable to get response"});
+        });
+      }
+    } catch (e) {
+      setState(() {
+        _messages
+            .add({"sender": "bot", "text": "Error: No internet connection"});
+      });
+    } finally {
+      setState(() => _isLoading = false);
+      _scrollToBottom();
+      _updateChatSessions();
+    }
+  }
+
+  void _scrollToBottom() {
+    Future.delayed(const Duration(milliseconds: 300), () {
+      if (_scrollController.hasClients) {
+        _scrollController.animateTo(
+          _scrollController.position.maxScrollExtent,
+          duration: const Duration(milliseconds: 300),
+          curve: Curves.easeOut,
+        );
+      }
+    });
+  }
+
+  void _renameChat() {
+    TextEditingController _renameController =
+        TextEditingController(text: _chatTitle);
+    showDialog(
+      context: context,
+      builder: (context) {
+        return AlertDialog(
+          title: const Text("Rename Chat"),
+          content: TextField(
+            controller: _renameController,
+            decoration: const InputDecoration(hintText: "Enter new chat name"),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text("Cancel"),
+            ),
+            TextButton(
+              onPressed: () {
+                setState(() {
+                  _chatTitle = _renameController.text;
+                  if (_selectedChatIndex != -1) {
+                    _chatSessions[_selectedChatIndex]["name"] = _chatTitle;
+                  } else {
+                    _chatSessions
+                        .add({"name": _chatTitle, "messages": _messages});
+                    _selectedChatIndex = _chatSessions.length - 1;
+                  }
+                });
+                _saveChatHistory();
+                Navigator.pop(context);
+              },
+              child: const Text("Save"),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+  void _updateChatSessions() {
+    if (_selectedChatIndex == -1) {
+      if (_messages.isNotEmpty) {
+        _chatSessions.add({
+          "name": _chatTitle,
+          "messages": List<Map<String, String>>.from(_messages)
+        });
+        _selectedChatIndex = _chatSessions.length - 1;
+      }
+    } else {
+      _chatSessions[_selectedChatIndex]["messages"] =
+          List<Map<String, String>>.from(_messages);
+    }
+    _saveChatHistory();
+  }
+
+  Future<void> _showUploadDialog() async {
+    showDialog(
+      context: context,
+      builder: (context) {
+        return AlertDialog(
+          title: const Text("Upload File"),
+          content: const Text("Choose the type of file to upload:"),
+          actions: [
+            TextButton(
+              onPressed: () {
+                Navigator.pop(context);
+                _uploadFile('image');
+              },
+              child: const Text("Image"),
+            ),
+            TextButton(
+              onPressed: () {
+                Navigator.pop(context);
+                _uploadFile('pdf');
+              },
+              child: const Text("PDF"),
+            ),
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text("Cancel"),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+  Future<void> _uploadFile(String type) async {
+    FilePickerResult? result;
+    if (type == 'image') {
+      result = await FilePicker.platform.pickFiles(
+        type: FileType.image,
+      );
+    } else if (type == 'pdf') {
+      result = await FilePicker.platform.pickFiles(
+        allowedExtensions: ['pdf'],
+        type: FileType.custom,
+      );
+    }
+
+    if (result != null && result.files.isNotEmpty) {
+      setState(() {
+        _messages.add({
+          "sender": "user",
+          "text":
+              "Uploading ${type == 'image' ? 'image' : 'PDF'}: ${result?.files.single.name}"
+        });
+        _isLoading = true;
+      });
+      _scrollToBottom();
+
+      try {
+        await Future.delayed(const Duration(seconds: 1));
+        setState(() {
+          _messages.add({
+            "sender": "bot",
+            "text":
+                "${type == 'image' ? 'Image' : 'PDF'} received and processed successfully"
+          });
+        });
+      } catch (e) {
+        setState(() {
+          _messages.add({"sender": "bot", "text": "Error uploading $type: $e"});
+        });
+      } finally {
+        setState(() => _isLoading = false);
+        _scrollToBottom();
+        _updateChatSessions();
+      }
+    }
+  }
+
+  void _deleteChat(int index) {
+    showDialog(
+      context: context,
+      builder: (context) {
+        return AlertDialog(
+          title: const Text("Delete Chat"),
+          content: const Text("Are you sure you want to delete this chat?"),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text("Cancel"),
+            ),
+            TextButton(
+              onPressed: () {
+                setState(() {
+                  _chatSessions.removeAt(index);
+                  if (_selectedChatIndex == index) {
+                    _messages.clear();
+                    _chatTitle = "New Chat";
+                    _selectedChatIndex = -1;
+                  } else if (_selectedChatIndex > index) {
+                    _selectedChatIndex--;
+                  }
+                });
+                _saveChatHistory();
+                Navigator.pop(context);
+              },
+              child: const Text("Delete"),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+  Widget _buildSidebar() {
+    return Drawer(
+      child: Column(
+        children: [
+          ListTile(
+            title: const Text("Chat History"),
+            trailing: IconButton(
+              icon: const Icon(Icons.close),
+              onPressed: () => Navigator.pop(context),
+            ),
+          ),
+          Expanded(
+            child: ListView.builder(
+              itemCount: _chatSessions.length,
+              itemBuilder: (context, index) {
+                return ListTile(
+                  title:
+                      Text(_chatSessions[index]["name"] ?? "Chat ${index + 1}"),
+                  trailing: IconButton(
+                    icon: const Icon(Icons.delete, color: Colors.red),
+                    onPressed: () => _deleteChat(index),
+                  ),
+                  onTap: () {
+                    setState(() {
+                      _selectedChatIndex = index;
+                      _messages = List<Map<String, String>>.from(
+                          _chatSessions[index]["messages"] ?? []);
+                      _chatTitle =
+                          _chatSessions[index]["name"] ?? "Chat ${index + 1}";
+                    });
+                    Navigator.pop(context);
+                  },
+                );
+              },
+            ),
+          ),
+          ListTile(
+            leading: const Icon(Icons.add),
+            title: const Text("New Chat"),
+            onTap: () {
+              setState(() {
+                _messages.clear();
+                _chatTitle = "New Chat";
+                _selectedChatIndex = -1;
+              });
+              Navigator.pop(context);
+            },
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildChatArea() {
+    return ListView.builder(
+      controller: _scrollController,
+      itemCount: _messages.length,
+      itemBuilder: (context, index) {
+        final message = _messages[index];
+        final isUser = message['sender'] == 'user';
+
+        return Align(
+          alignment: isUser ? Alignment.centerRight : Alignment.centerLeft,
+          child: Container(
+            margin: const EdgeInsets.symmetric(vertical: 5, horizontal: 10),
+            padding: const EdgeInsets.all(10),
+            decoration: BoxDecoration(
+              color: isUser ? Colors.blueAccent : Colors.grey[300],
+              borderRadius: BorderRadius.circular(10),
+            ),
+            child: Text(
+              message['text'] ?? '',
+              style: TextStyle(
+                color: isUser ? Colors.white : Colors.black87,
+              ),
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  Widget _buildInputField() {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 5),
+      decoration: const BoxDecoration(
+        color: Colors.white,
+        boxShadow: [BoxShadow(color: Colors.black26, blurRadius: 2)],
+      ),
+      child: Row(
+        children: [
+          IconButton(
+            icon: const Icon(Icons.upload_file, color: Colors.blueAccent),
+            onPressed: _showUploadDialog,
+          ),
+          Expanded(
+            child: TextField(
+              controller: _messageController,
+              decoration: const InputDecoration(
+                hintText: "Type a message...",
+                border: InputBorder.none,
+              ),
+              onSubmitted: (value) => _sendMessage(),
+            ),
+          ),
+          IconButton(
+            icon: const Icon(Icons.send, color: Colors.blueAccent),
+            onPressed: _sendMessage,
+          ),
+        ],
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      drawer: _buildSidebar(),
+      appBar: AppBar(
+        title: Text(_chatTitle),
+        leading: Builder(
+          builder: (context) => IconButton(
+            icon: const Icon(Icons.menu),
+            onPressed: () => Scaffold.of(context).openDrawer(),
+          ),
+        ),
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.edit),
+            onPressed: _renameChat,
+          ),
+        ],
+      ),
+      body: Column(
+        children: [
+          Expanded(child: _buildChatArea()),
+          if (_isLoading) const LinearProgressIndicator(),
+          _buildInputField(),
+        ],
+      ),
+    );
+  }
+}
+
+============================
+
+frontend/lib/screens/home.dart:
+
+contents:
+import 'package:flutter/material.dart';
+import 'academics_page.dart';
+import 'announcements_page.dart';
+import 'profile_page.dart';
+import 'chatbot_page.dart';
+
+class HomeScreen extends StatefulWidget {
+  final Map<String, String> userData; // Accept full user data
+
+  const HomeScreen({super.key, required this.userData});
+
+  @override
+  HomeScreenState createState() => HomeScreenState();
+}
+
+class HomeScreenState extends State<HomeScreen> {
+  int _selectedIndex = 0;
+  late List<Widget> _widgetOptions;
+  late String userName;
+
+  @override
+  void initState() {
+    super.initState();
+    userName = widget.userData['name'] ?? "User"; // Use 'name' from backend
+    _initializePages();
+  }
+
+  void _initializePages() {
+    _widgetOptions = [
+      HomeContent(userData: widget.userData),
+      const ChatbotPage(),
+      const AcademicsPage(),
+      const AnnouncementsPage(),
+      const ProfilePage(),
+    ];
+  }
+
+  void _onItemTapped(int index) {
+    setState(() {
+      _selectedIndex = index;
+    });
+  }
+
+  // ✅ Function to dynamically update the title based on the selected page
+  String _getTitle() {
+    switch (_selectedIndex) {
+      case 0:
+        return "Welcome, $userName"; // ✅ Home Screen
+      case 1:
+        return "Chatbot"; // ✅ Chatbot Page
+      case 2:
+        return "Academics"; // ✅ Academics Page
+      case 3:
+        return "Announcements"; // ✅ Announcements Page
+      case 4:
+        return "Profile"; // ✅ Profile Page
+      default:
+        return "Campus Connect";
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(
+        title: Text(
+          _getTitle(), // ✅ Dynamic title updates
+          style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+        ),
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.notifications), // ✅ Notification Icon
+            onPressed: () {
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(content: Text("Notifications clicked!")),
+              );
+            },
+          ),
+          const SizedBox(width: 10),
+        ],
+      ),
+      body: _widgetOptions[_selectedIndex],
+      bottomNavigationBar: BottomNavigationBar(
+        items: const <BottomNavigationBarItem>[
+          BottomNavigationBarItem(icon: Icon(Icons.home), label: 'Home'),
+          BottomNavigationBarItem(icon: Icon(Icons.chat), label: 'Chatbot'),
+          BottomNavigationBarItem(icon: Icon(Icons.school), label: 'Academics'),
+          BottomNavigationBarItem(
+              icon: Icon(Icons.announcement), label: 'Announcements'),
+          BottomNavigationBarItem(icon: Icon(Icons.person), label: 'Profile'),
+        ],
+        currentIndex: _selectedIndex,
+        selectedItemColor: Theme.of(context).primaryColor,
+        unselectedItemColor: Colors.grey,
+        onTap: _onItemTapped,
+      ),
+    );
+  }
+}
+
+// ✅ Home Content Section with Welcome Message
+class HomeContent extends StatelessWidget {
+  final Map<String, String> userData;
+
+  const HomeContent({super.key, required this.userData});
+
+  @override
+  Widget build(BuildContext context) {
+    String userName = userData['name'] ?? "Guest"; // Use 'name' from backend
+
+    return SingleChildScrollView(
+      child: Padding(
+        padding: const EdgeInsets.all(16.0),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              'Welcome, $userName!', // ✅ Dynamic welcome message
+              style: TextStyle(
+                fontSize: 24,
+                fontWeight: FontWeight.bold,
+                color: Theme.of(context).primaryColor,
+              ),
+            ),
+            const SizedBox(height: 20),
+            Text(
+              'What would you like to do today?',
+              style: TextStyle(
+                fontSize: 18,
+                color: Theme.of(context).hintColor,
+              ),
+            ),
+            const SizedBox(height: 20),
+            GridView.count(
+              crossAxisCount: 2,
+              shrinkWrap: true,
+              physics: const NeverScrollableScrollPhysics(),
+              mainAxisSpacing: 16,
+              crossAxisSpacing: 16,
+              children: [
+                _buildFeatureCard(context, 'Subjects', Icons.book),
+                _buildFeatureCard(context, 'Exam Details', Icons.assignment),
+                _buildFeatureCard(context, 'Teachers Info', Icons.person),
+                _buildFeatureCard(context, 'Assignments', Icons.description),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildFeatureCard(BuildContext context, String title, IconData icon) {
+    return Card(
+      elevation: 4,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+      child: InkWell(
+        onTap: () {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('You tapped on $title')),
+          );
+        },
+        child: Padding(
+          padding: const EdgeInsets.all(16.0),
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(icon, size: 48, color: Theme.of(context).primaryColor),
+              const SizedBox(height: 12),
+              Text(
+                title,
+                style: TextStyle(
+                  fontSize: 16,
+                  fontWeight: FontWeight.bold,
+                  color: Theme.of(context).primaryColor,
+                ),
+                textAlign: TextAlign.center,
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+============================
+
+frontend/lib/screens/login.dart:
+
+contents:
+import 'package:flutter/material.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+import 'home.dart';
+import 'admin_dashboard.dart';
+
+class LoginScreen extends StatefulWidget {
+  @override
+  LoginScreenState createState() => LoginScreenState();
+}
+
+class LoginScreenState extends State<LoginScreen> {
+  final _formKey = GlobalKey<FormState>();
+  final TextEditingController admissionNumberController =
+      TextEditingController();
+  final TextEditingController passwordController = TextEditingController();
+  bool isLoading = false;
+  bool isCheckingRole = true; // ✅ Track role checking
+
+  @override
+  void initState() {
+    super.initState();
+    _checkUserRole(); // ✅ Ensure role is checked before UI builds
+  }
+
+  Future<void> _checkUserRole() async {
+    SharedPreferences prefs = await SharedPreferences.getInstance();
+    String? role = prefs.getString('role');
+
+    if (role == 'admin') {
+      Future.delayed(Duration.zero, () {
+        Navigator.pushReplacement(
+          context,
+          MaterialPageRoute(builder: (context) => AdminDashboard()),
+        );
+      });
+    } else if (role == 'student' || role == 'teacher') {
+      Future.delayed(Duration.zero, () {
+        Navigator.pushReplacement(
+          context,
+          MaterialPageRoute(
+            builder: (context) => HomeScreen(userData: {
+              'name': prefs.getString('name') ?? "User",
+              'email': prefs.getString('email') ?? "N/A",
+              'phone': prefs.getString('phone') ?? "N/A",
+              'admission_number': prefs.getString('admission_number') ?? "",
+            }),
+          ),
+        );
+      });
+    }
+
+    setState(() {
+      isCheckingRole = false; // ✅ Allow UI to load after role check
+    });
+  }
+
+  Future<void> _login() async {
+    if (!_formKey.currentState!.validate()) {
+      return;
+    }
+
+    setState(() {
+      isLoading = true;
+    });
+
+    String admissionNumber = admissionNumberController.text;
+    String password = passwordController.text;
+
+    try {
+      // Simulate API call with hardcoded credentials
+      await Future.delayed(Duration(seconds: 2));
+
+      SharedPreferences prefs = await SharedPreferences.getInstance();
+      if (admissionNumber == 'admin' && password == 'admin123') {
+        await prefs.setString('role', 'admin');
+        await prefs.setString('name', 'Admin User');
+        await prefs.setString('email', 'admin@campusconnect.com');
+        await prefs.setString('phone', '9876543210');
+
+        Navigator.pushReplacement(
+          context,
+          MaterialPageRoute(builder: (context) => AdminDashboard()),
+        );
+      } else if (admissionNumber == 'student' && password == 'student123') {
+        await prefs.setString('role', 'student');
+        await prefs.setString('name', 'Student User');
+        await prefs.setString('email', 'student@campusconnect.com');
+        await prefs.setString('phone', '1234567890');
+        await prefs.setString('admission_number', 'STU123');
+
+        Navigator.pushReplacement(
+          context,
+          MaterialPageRoute(
+            builder: (context) => HomeScreen(userData: {
+              'name': 'Student User',
+              'email': 'student@campusconnect.com',
+              'phone': '1234567890',
+              'admission_number': 'STU123',
+            }),
+          ),
+        );
+      } else {
+        _showMessage('Invalid credentials. Please try again.', Colors.red);
+      }
+    } catch (e) {
+      _showMessage('Login failed. Please try again later.', Colors.red);
+    }
+
+    setState(() {
+      isLoading = false;
+    });
+  }
+
+  void _showMessage(String message, Color color) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(message),
+        backgroundColor: color,
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      body: isCheckingRole
+          ? const Center(
+              child:
+                  CircularProgressIndicator()) // ✅ Show loading while checking role
+          : SafeArea(
+              child: Padding(
+                padding: const EdgeInsets.all(16.0),
+                child: Form(
+                  key: _formKey,
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      Text(
+                        'Campus Connect',
+                        style: TextStyle(
+                          fontSize: 32,
+                          fontWeight: FontWeight.bold,
+                          color: Theme.of(context).primaryColor,
+                        ),
+                        textAlign: TextAlign.center,
+                      ),
+                      const SizedBox(height: 40),
+                      TextFormField(
+                        controller: admissionNumberController,
+                        decoration: const InputDecoration(
+                          labelText: 'Admission Number',
+                          border: OutlineInputBorder(),
+                          prefixIcon: Icon(Icons.person),
+                        ),
+                        validator: (value) => value == null || value.isEmpty
+                            ? 'Please enter your admission number'
+                            : null,
+                      ),
+                      const SizedBox(height: 20),
+                      TextFormField(
+                        controller: passwordController,
+                        decoration: const InputDecoration(
+                          labelText: 'Password',
+                          border: OutlineInputBorder(),
+                          prefixIcon: Icon(Icons.lock),
+                        ),
+                        obscureText: true,
+                        validator: (value) => value == null || value.isEmpty
+                            ? 'Please enter your password'
+                            : null,
+                      ),
+                      const SizedBox(height: 20),
+                      ElevatedButton(
+                        onPressed: isLoading ? null : _login,
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: Theme.of(context).primaryColor,
+                        ),
+                        child: isLoading
+                            ? const CircularProgressIndicator(
+                                color: Colors.white)
+                            : const Text('Login',
+                                style: TextStyle(
+                                    fontSize: 18, color: Colors.white)),
+                      ),
+                      const SizedBox(height: 20),
+                      TextButton(
+                        onPressed: () {
+                          if (!admissionNumberController.text
+                              .endsWith("admin@mbcpeermade.com")) {
+                            Navigator.pushNamed(context, '/signup');
+                          } else {
+                            _showMessage(
+                                "Admins cannot sign up manually", Colors.red);
+                          }
+                        },
+                        child: const Text("Don't have an account? Sign Up"),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+    );
+  }
+}
+
+============================
+
+frontend/lib/screens/profile_page.dart:
+
+contents:
+import 'package:flutter/material.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+import 'package:image_picker/image_picker.dart';
+import 'dart:io';
+
+class ProfilePage extends StatefulWidget {
+  const ProfilePage({super.key});
+
+  @override
+  State<ProfilePage> createState() => _ProfilePageState();
+}
+
+class _ProfilePageState extends State<ProfilePage> {
+  String admissionNumber = "";
+  String role = "";
+  String email = "";
+  String phone = "";
+  String name = "User";
+  String department = "";
+  String profileImagePath = ""; // ✅ Path to profile image
+
+  final TextEditingController nameController = TextEditingController();
+  final TextEditingController emailController = TextEditingController();
+  final TextEditingController phoneController = TextEditingController();
+
+  @override
+  void initState() {
+    super.initState();
+    _loadUserData();
+  }
+
+  Future<void> _loadUserData() async {
+    SharedPreferences prefs = await SharedPreferences.getInstance();
+    setState(() {
+      admissionNumber = prefs.getString('admission_number') ?? "N/A";
+      role = prefs.getString('role') ?? "N/A";
+      email = prefs.getString('email') ?? "N/A";
+      phone = prefs.getString('phone') ?? "N/A";
+      name = prefs.getString('name') ?? "User";
+      department = prefs.getString('department') ?? "Unknown";
+      profileImagePath = prefs.getString('profile_image') ?? "";
+    });
+
+    nameController.text = name;
+    emailController.text = email;
+    phoneController.text = phone;
+  }
+
+  Future<void> _updateUserData() async {
+    SharedPreferences prefs = await SharedPreferences.getInstance();
+    await prefs.setString('name', nameController.text);
+    await prefs.setString('email', emailController.text);
+    await prefs.setString('phone', phoneController.text);
+
+    setState(() {
+      name = nameController.text;
+      email = emailController.text;
+      phone = phoneController.text;
+    });
+
+    Navigator.pop(context);
+  }
+
+  Future<void> _logout() async {
+    SharedPreferences prefs = await SharedPreferences.getInstance();
+    await prefs.clear(); // ✅ Clear saved user data
+    Navigator.of(context).pushReplacementNamed('/login');
+  }
+
+  Future<void> _pickProfileImage() async {
+    final ImagePicker picker = ImagePicker();
+    final XFile? image = await picker.pickImage(source: ImageSource.gallery);
+
+    if (image != null) {
+      SharedPreferences prefs = await SharedPreferences.getInstance();
+      await prefs.setString('profile_image', image.path);
+
+      setState(() {
+        profileImagePath = image.path;
+      });
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return SingleChildScrollView(
+      child: Column(
+        children: [
+          const SizedBox(height: 20),
+          GestureDetector(
+            onTap: _pickProfileImage, // ✅ Upload profile picture
+            child: CircleAvatar(
+              radius: 50,
+              backgroundImage: profileImagePath.isNotEmpty
+                  ? FileImage(File(profileImagePath)) as ImageProvider
+                  : const AssetImage('assets/default_profile.png'),
+              child: Align(
+                alignment: Alignment.bottomRight,
+                child: CircleAvatar(
+                  backgroundColor: Colors.white,
+                  radius: 15,
+                  child: Icon(Icons.camera_alt,
+                      color: Theme.of(context).primaryColor, size: 20),
+                ),
+              ),
+            ),
+          ),
+          const SizedBox(height: 10),
+          Text(
+            name,
+            style: const TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
+          ),
+          Text(
+            '$department - ${role.toUpperCase()}',
+            style: const TextStyle(fontSize: 16, color: Colors.grey),
+          ),
+          const SizedBox(height: 20),
+          _buildInfoCard(),
+          const SizedBox(height: 20),
+          _buildActionButtons(),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildInfoCard() {
+    return Card(
+      margin: const EdgeInsets.symmetric(horizontal: 16.0),
+      child: Padding(
+        padding: const EdgeInsets.all(16.0),
+        child: Column(
+          children: [
+            _buildInfoRow(Icons.email, email),
+            const Divider(),
+            _buildInfoRow(Icons.phone, phone),
+            const Divider(),
+            _buildInfoRow(Icons.school, 'Admission No: $admissionNumber'),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildInfoRow(IconData icon, String text) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 8.0),
+      child: Row(
+        children: [
+          Icon(icon, color: Colors.grey),
+          const SizedBox(width: 10),
+          Text(text),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildActionButtons() {
+    return Column(
+      children: [
+        ElevatedButton(
+          onPressed: _showEditProfileDialog, // ✅ Edit details
+          style: ElevatedButton.styleFrom(
+            backgroundColor: Theme.of(context).primaryColor,
+            foregroundColor: Colors.white, // ✅ Text color set to white
+            minimumSize: const Size(200, 40),
+          ),
+          child: const Text('Edit Profile'),
+        ),
+        const SizedBox(height: 10),
+        ElevatedButton(
+          onPressed: _logout, // ✅ Logout function
+          style: ElevatedButton.styleFrom(
+            backgroundColor: Colors.red,
+            foregroundColor: Colors.white, // ✅ Text color set to white
+            minimumSize: const Size(200, 40),
+          ),
+          child: const Text('Logout'),
+        ),
+      ],
+    );
+  }
+
+  void _showEditProfileDialog() {
+    showDialog(
+      context: context,
+      builder: (context) {
+        return AlertDialog(
+          title: const Text("Edit Profile"),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              TextFormField(
+                controller: nameController,
+                decoration: const InputDecoration(labelText: "Name"),
+              ),
+              const SizedBox(height: 10),
+              TextFormField(
+                controller: emailController,
+                decoration: const InputDecoration(labelText: "Email"),
+              ),
+              const SizedBox(height: 10),
+              TextFormField(
+                controller: phoneController,
+                decoration: const InputDecoration(labelText: "Phone"),
+              ),
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text("Cancel"),
+            ),
+            ElevatedButton(
+              onPressed: _updateUserData, // ✅ Update data
+              child: const Text("Save"),
+            ),
+          ],
+        );
+      },
+    );
+  }
+}
+
+============================
+
+frontend/lib/screens/signup.dart:
+
+contents:
+import 'package:flutter/material.dart';
+import 'package:http/http.dart' as http;
+import 'dart:convert';
+import '../utils/network_config.dart';
+
+class SignUpScreen extends StatefulWidget {
+  const SignUpScreen({super.key});
+
+  @override
+  SignUpScreenState createState() => SignUpScreenState();
+}
+
+class SignUpScreenState extends State<SignUpScreen>
+    with SingleTickerProviderStateMixin {
+  final _formKey = GlobalKey<FormState>();
+  final TextEditingController emailController = TextEditingController();
+  final TextEditingController usernameController = TextEditingController();
+  final TextEditingController passwordController = TextEditingController();
+  final TextEditingController phoneNumberController = TextEditingController();
+
+  late AnimationController _animationController;
+  late Animation<double> _fadeAnimation;
+
+  @override
+  void initState() {
+    super.initState();
+    _animationController = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 1000),
+    );
+    _fadeAnimation =
+        Tween<double>(begin: 0.0, end: 1.0).animate(_animationController);
+    _animationController.forward();
+  }
+
+  @override
+  void dispose() {
+    _animationController.dispose();
+    emailController.clear();
+    usernameController.clear();
+    passwordController.clear();
+    phoneNumberController.clear();
+
+    emailController.dispose();
+    usernameController.dispose();
+    passwordController.dispose();
+    phoneNumberController.dispose();
+    super.dispose();
+  }
+
+  void _showMessage(String message, Color color) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(message),
+        duration: const Duration(seconds: 2),
+        backgroundColor: color,
+      ),
+    );
+  }
+
+  Future<void> _onSignUp() async {
+    if (_formKey.currentState!.validate()) {
+      final String email = emailController.text.trim();
+      final String username = usernameController.text.trim();
+      final String password = passwordController.text.trim();
+      final String phoneNumber = phoneNumberController.text.trim();
+
+      if (!email.contains('@')) {
+        _showMessage("Invalid email format", Colors.red);
+        return;
+      }
+      final String admissionNumber = email.split('@')[0];
+
+      print(
+          "Sending signup request: admission_number=$admissionNumber, email=$email, name=$username, password=$password, phone_number=$phoneNumber");
+
+      try {
+        final String baseUrl = NetworkConfig.getBaseUrl();
+        final response = await http.post(
+          Uri.parse("$baseUrl/api/auth/signup"),
+          headers: {"Content-Type": "application/json"},
+          body: jsonEncode({
+            "admission_number": admissionNumber,
+            "email": email,
+            "name": username,
+            "password": password,
+            "phone_number": phoneNumber,
+          }),
+        );
+
+        print("Response status: ${response.statusCode}");
+        print("Response body: ${response.body}");
+
+        if (response.statusCode == 201) {
+          _showMessage("Signup Successful!", Colors.green);
+          Future.delayed(const Duration(seconds: 2), () {
+            print("Redirecting to login");
+            Navigator.pushReplacementNamed(context, '/login');
+          });
+        } else {
+          try {
+            final responseData = jsonDecode(response.body);
+            String errorMessage =
+                responseData['error'] ?? 'Signup failed. Please try again.';
+            _showMessage(errorMessage, Colors.red);
+          } catch (_) {
+            _showMessage(
+                "Unexpected server response. Please try again.", Colors.red);
+          }
+        }
+      } catch (e) {
+        print("Signup exception: $e");
+        _showMessage("Signup Failed: Network error", Colors.red);
+      }
+    } else {
+      print("Form validation failed");
+      _showMessage(
+          "Signup Failed: Please fill all fields correctly", Colors.red);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      body: SafeArea(
+        child: FadeTransition(
+          opacity: _fadeAnimation,
+          child: Padding(
+            padding: const EdgeInsets.all(16.0),
+            child: Form(
+              key: _formKey,
+              child: SingleChildScrollView(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    Text(
+                      'Create Account',
+                      style: TextStyle(
+                        fontSize: 32,
+                        fontWeight: FontWeight.bold,
+                        color: Theme.of(context).primaryColor,
+                      ),
+                      textAlign: TextAlign.center,
+                    ),
+                    const SizedBox(height: 40),
+                    TextFormField(
+                      controller: emailController,
+                      decoration: const InputDecoration(
+                        labelText: 'Email',
+                        border: OutlineInputBorder(),
+                        prefixIcon: Icon(Icons.email),
+                      ),
+                      validator: (value) {
+                        if (value == null || value.isEmpty) {
+                          return 'Please enter your email';
+                        }
+                        if (!RegExp(r'^[\w\.-]+@[\w\.-]+\.\w+$')
+                            .hasMatch(value)) {
+                          return 'Please enter a valid email';
+                        }
+                        return null;
+                      },
+                    ),
+                    const SizedBox(height: 20),
+                    TextFormField(
+                      controller: usernameController,
+                      decoration: const InputDecoration(
+                        labelText: 'Username',
+                        border: OutlineInputBorder(),
+                        prefixIcon: Icon(Icons.person),
+                      ),
+                      validator: (value) {
+                        if (value == null || value.isEmpty) {
+                          return 'Please enter your username';
+                        }
+                        return null;
+                      },
+                    ),
+                    const SizedBox(height: 20),
+                    TextFormField(
+                      controller: passwordController,
+                      decoration: const InputDecoration(
+                        labelText: 'Password',
+                        border: OutlineInputBorder(),
+                        prefixIcon: Icon(Icons.lock),
+                      ),
+                      obscureText: true,
+                      validator: (value) {
+                        if (value == null || value.isEmpty) {
+                          return 'Please enter your password';
+                        }
+                        if (value.length < 6) {
+                          return 'Password must be at least 6 characters';
+                        }
+                        if (!RegExp(
+                                r'^(?=.*[A-Za-z])(?=.*\d)[A-Za-z\d@$!%*?&]{6,}$')
+                            .hasMatch(value)) {
+                          return 'Password must contain letters, numbers & special chars';
+                        }
+                        return null;
+                      },
+                    ),
+                    const SizedBox(height: 20),
+                    TextFormField(
+                      controller: phoneNumberController,
+                      decoration: const InputDecoration(
+                        labelText: 'Phone Number',
+                        border: OutlineInputBorder(),
+                        prefixIcon: Icon(Icons.phone),
+                      ),
+                      validator: (value) {
+                        if (value == null || value.isEmpty) {
+                          return 'Please enter your phone number';
+                        }
+                        if (!RegExp(r'^\d{10,}$').hasMatch(value)) {
+                          return 'Enter a valid phone number';
+                        }
+                        return null;
+                      },
+                    ),
+                    const SizedBox(height: 20),
+                    ElevatedButton(
+                      onPressed: _onSignUp,
+                      child: const Padding(
+                        padding: EdgeInsets.all(12.0),
+                        child: Text('Sign Up', style: TextStyle(fontSize: 18)),
+                      ),
+                    ),
+                    const SizedBox(height: 20),
+                    TextButton(
+                      onPressed: () {
+                        Navigator.pop(context);
+                      },
+                      child: const Text('Already have an account? Login'),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+============================
+
+frontend/lib/screens/splash.dart:
+
+contents:
+import 'package:flutter/material.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+import 'admin_dashboard.dart'; // ✅ Import Admin Dashboard
+
+class SplashScreen extends StatefulWidget {
+  const SplashScreen({super.key});
+
+  @override
+  SplashScreenState createState() => SplashScreenState();
+}
+
+class SplashScreenState extends State<SplashScreen>
+    with SingleTickerProviderStateMixin {
+  late AnimationController _controller;
+  late Animation<double> _fadeAnimation;
+  late Animation<Offset> _slideAnimation;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = AnimationController(
+      duration: const Duration(seconds: 2),
+      vsync: this,
+    );
+
+    _fadeAnimation = Tween<double>(begin: 0.0, end: 1.0).animate(_controller);
+    _slideAnimation =
+        Tween<Offset>(begin: const Offset(0, 0.5), end: Offset.zero).animate(
+      CurvedAnimation(parent: _controller, curve: Curves.easeOutCubic),
+    );
+
+    _controller.forward();
+
+    _navigateToNextScreen();
+  }
+
+  Future<void> _navigateToNextScreen() async {
+    SharedPreferences prefs = await SharedPreferences.getInstance();
+    String? role = prefs.getString('role');
+
+    // ✅ Debugging: Print role to check stored value
+    print("User Role from SharedPreferences: $role");
+
+    await Future.delayed(const Duration(seconds: 3)); // Ensure animation plays
+
+    if (mounted) {
+      if (role == 'admin') {
+        print("✅ Redirecting to Admin Dashboard");
+        Navigator.of(context).pushReplacement(
+          MaterialPageRoute(builder: (context) => AdminDashboard()),
+        );
+      } else {
+        print("✅ Redirecting to Login Page");
+        Navigator.of(context).pushReplacementNamed('/login');
+      }
+    }
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      backgroundColor: Theme.of(context).primaryColor,
+      body: Center(
+        child: FadeTransition(
+          opacity: _fadeAnimation,
+          child: SlideTransition(
+            position: _slideAnimation,
+            child: const Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Icon(
+                  Icons.school,
+                  size: 100,
+                  color: Colors.white,
+                ),
+                SizedBox(height: 20),
+                Text(
+                  'Campus Connect',
+                  style: TextStyle(
+                    fontSize: 40,
+                    fontWeight: FontWeight.bold,
+                    color: Colors.white,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+============================
+
+frontend/lib/screens/staffs_page.dart:
+
+contents:
+import 'package:flutter/material.dart';
+import 'dart:convert';
+import 'package:http/http.dart' as http;
+import '../utils/network_config.dart';
+
+class StaffsPage extends StatefulWidget {
+  @override
+  _StaffsPageState createState() => _StaffsPageState();
+}
+
+class _StaffsPageState extends State<StaffsPage> {
+  List<dynamic> _teachers = [];
+
+  @override
+  void initState() {
+    super.initState();
+    fetchUsers();
+  }
+
+  Future<void> fetchUsers() async {
+    final url = Uri.parse('${NetworkConfig.getBaseUrl()}/users');
+    final response = await http.get(url);
+
+    if (response.statusCode == 200) {
+      List<dynamic> users = json.decode(response.body);
+      setState(() {
+        _teachers = users.where((user) => user['role'] == 'teacher').toList();
+      });
+    } else {
+      throw Exception('Failed to load teacher data');
+    }
+  }
+
+  Future<void> deleteUser(String admissionNumber) async {
+    final url =
+        Uri.parse('${NetworkConfig.getBaseUrl()}/delete_user/$admissionNumber');
+    final response = await http.delete(url);
+
+    if (response.statusCode == 200) {
+      setState(() {
+        _teachers.removeWhere(
+            (teacher) => teacher['admission_number'] == admissionNumber);
+      });
+    }
+  }
+
+  void showEditDialog(Map<String, dynamic> teacher) {
+    TextEditingController usernameController =
+        TextEditingController(text: teacher['username']);
+    TextEditingController emailController =
+        TextEditingController(text: teacher['email']);
+
+    showDialog(
+      context: context,
+      builder: (context) {
+        return AlertDialog(
+          title: Text("Edit Teacher"),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              TextField(
+                  controller: usernameController,
+                  decoration: InputDecoration(labelText: "Username")),
+              TextField(
+                  controller: emailController,
+                  decoration: InputDecoration(labelText: "Email")),
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: () async {
+                await updateUser(teacher['admission_number'],
+                    usernameController.text, emailController.text, 'teacher');
+                Navigator.pop(context);
+              },
+              child: Text("Save"),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+  Future<void> updateUser(String admissionNumber, String username, String email,
+      String role) async {
+    final url =
+        Uri.parse('${NetworkConfig.getBaseUrl()}/update_user/$admissionNumber');
+    final response = await http.put(
+      url,
+      headers: {"Content-Type": "application/json"},
+      body: jsonEncode({"username": username, "email": email, "role": role}),
+    );
+
+    if (response.statusCode == 200) {
+      fetchUsers();
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(title: Text("Teachers")),
+      body: ListView.builder(
+        itemCount: _teachers.length,
+        itemBuilder: (context, index) {
+          final teacher = _teachers[index];
+          return ListTile(
+            leading: Icon(Icons.person),
+            title: Text(teacher['username']),
+            subtitle: Text("Email: ${teacher['email']}"),
+            trailing: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                IconButton(
+                    icon: Icon(Icons.edit),
+                    onPressed: () => showEditDialog(teacher)),
+                IconButton(
+                    icon: Icon(Icons.delete),
+                    onPressed: () => deleteUser(teacher['admission_number'])),
+              ],
+            ),
+          );
+        },
+      ),
+    );
+  }
+}
+
+============================
+
+frontend/lib/screens/students_page.dart:
+
+contents:
+import 'package:flutter/material.dart';
+import 'dart:convert';
+import 'package:http/http.dart' as http;
+import '../utils/network_config.dart';
+
+class StudentsPage extends StatefulWidget {
+  @override
+  _StudentsPageState createState() => _StudentsPageState();
+}
+
+class _StudentsPageState extends State<StudentsPage> {
+  List<dynamic> _students = [];
+
+  @override
+  void initState() {
+    super.initState();
+    fetchUsers();
+  }
+
+  Future<void> fetchUsers() async {
+    final url = Uri.parse('${NetworkConfig.getBaseUrl()}/users');
+    final response = await http.get(url);
+
+    if (response.statusCode == 200) {
+      List<dynamic> users = json.decode(response.body);
+      setState(() {
+        _students = users.where((user) => user['role'] == 'student').toList();
+      });
+    } else {
+      throw Exception('Failed to load student data');
+    }
+  }
+
+  Future<void> deleteUser(String admissionNumber) async {
+    final url =
+        Uri.parse('${NetworkConfig.getBaseUrl()}/delete_user/$admissionNumber');
+    final response = await http.delete(url);
+
+    if (response.statusCode == 200) {
+      setState(() {
+        _students.removeWhere(
+            (student) => student['admission_number'] == admissionNumber);
+      });
+    }
+  }
+
+  void showEditDialog(Map<String, dynamic> student) {
+    TextEditingController usernameController =
+        TextEditingController(text: student['username']);
+    TextEditingController emailController =
+        TextEditingController(text: student['email']);
+
+    showDialog(
+      context: context,
+      builder: (context) {
+        return AlertDialog(
+          title: Text("Edit Student"),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              TextField(
+                  controller: usernameController,
+                  decoration: InputDecoration(labelText: "Username")),
+              TextField(
+                  controller: emailController,
+                  decoration: InputDecoration(labelText: "Email")),
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: () async {
+                await updateUser(student['admission_number'],
+                    usernameController.text, emailController.text, 'student');
+                Navigator.pop(context);
+              },
+              child: Text("Save"),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+  Future<void> updateUser(String admissionNumber, String username, String email,
+      String role) async {
+    final url =
+        Uri.parse('${NetworkConfig.getBaseUrl()}/update_user/$admissionNumber');
+    final response = await http.put(
+      url,
+      headers: {"Content-Type": "application/json"},
+      body: jsonEncode({"username": username, "email": email, "role": role}),
+    );
+
+    if (response.statusCode == 200) {
+      fetchUsers();
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(title: Text("Students")),
+      body: ListView.builder(
+        itemCount: _students.length,
+        itemBuilder: (context, index) {
+          final student = _students[index];
+          return ListTile(
+            leading: Icon(Icons.school),
+            title: Text(student['username']),
+            subtitle: Text("Email: ${student['email']}"),
+            trailing: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                IconButton(
+                    icon: Icon(Icons.edit),
+                    onPressed: () => showEditDialog(student)),
+                IconButton(
+                    icon: Icon(Icons.delete),
+                    onPressed: () => deleteUser(student['admission_number'])),
+              ],
+            ),
+          );
+        },
+      ),
+    );
+  }
+}
+
+============================
+
+frontend/lib/utils/network_config.dart:
+
+contents:
+import 'dart:io';
+
+class NetworkConfig {
+  static String getBaseUrl() {
+    if (Platform.isAndroid) {
+      return "http://10.0.2.2:5001"; // ✅ Android Emulator
+    } else if (Platform.isIOS) {
+      return "http://localhost:5001"; // ✅ iOS Simulator
+    } else {
+      return "http://192.168.1.7:5001"; // ✅ Change this to your local backend IP
+    }
+  }
+}
+

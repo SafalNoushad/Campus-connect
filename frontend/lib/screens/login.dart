@@ -1,14 +1,12 @@
 import 'package:flutter/material.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
-import 'package:shared_preferences/shared_preferences.dart';
+import '../utils/network_config.dart';
 import 'home.dart';
-import 'admin_dashboard.dart'; // ✅ Import AdminDashboard
-import '../utils/network_config.dart'; // ✅ Import dynamic backend URL
+import 'admin_dashboard.dart';
 
 class LoginScreen extends StatefulWidget {
-  const LoginScreen({super.key});
-
   @override
   LoginScreenState createState() => LoginScreenState();
 }
@@ -19,35 +17,45 @@ class LoginScreenState extends State<LoginScreen> {
       TextEditingController();
   final TextEditingController passwordController = TextEditingController();
   bool isLoading = false;
+  bool isCheckingRole = true;
 
   @override
-  void dispose() {
-    admissionNumberController.dispose();
-    passwordController.dispose();
-    super.dispose();
+  void initState() {
+    super.initState();
+    _checkUserRole();
   }
 
-  // ✅ Save user data with proper type conversion
-  Future<void> _saveUserData(
-      Map<String, dynamic> userData, String token) async {
+  Future<void> _checkUserRole() async {
     SharedPreferences prefs = await SharedPreferences.getInstance();
+    String? token = prefs.getString('jwt_token');
+    String? role = prefs.getString('role');
 
-    // ✅ Save each field properly
-    await prefs.setString('jwtToken', token);
-    await prefs.setString(
-        'admission_number', userData['admission_number'] ?? "");
-    await prefs.setString('name', userData['name'] ?? "User");
-    await prefs.setString('email', userData['email'] ?? "N/A");
-    await prefs.setString(
-        'phone', userData['phone_number'] ?? "N/A"); // ✅ Handle missing phone
-    await prefs.setString('role', userData['role'] ?? "guest");
+    if (token != null && role == 'admin') {
+      Navigator.pushReplacement(
+        context,
+        MaterialPageRoute(builder: (context) => AdminDashboard()),
+      );
+    } else if (token != null && (role == 'student' || role == 'teacher')) {
+      Navigator.pushReplacement(
+        context,
+        MaterialPageRoute(
+          builder: (context) => HomeScreen(userData: {
+            'name': prefs.getString('name') ?? "User",
+            'email': prefs.getString('email') ?? "N/A",
+            'phone': prefs.getString('phone') ?? "N/A",
+            'admission_number': prefs.getString('admission_number') ?? "",
+          }),
+        ),
+      );
+    }
 
-    debugPrint("✅ User Data Saved: $userData");
+    setState(() {
+      isCheckingRole = false;
+    });
   }
 
   Future<void> _login() async {
     if (!_formKey.currentState!.validate()) {
-      _showMessage("Login Failed: Please fill all fields", Colors.red);
       return;
     }
 
@@ -55,58 +63,57 @@ class LoginScreenState extends State<LoginScreen> {
       isLoading = true;
     });
 
+    String admissionNumber = admissionNumberController.text;
+    String password = passwordController.text;
+
     try {
       final response = await http.post(
-        Uri.parse("${NetworkConfig.getBaseUrl()}/api/auth/login"),
-        headers: {"Content-Type": "application/json"},
+        Uri.parse('${NetworkConfig.getBaseUrl()}/api/auth/login'),
+        headers: {'Content-Type': 'application/json'},
         body: jsonEncode({
-          "admission_number": admissionNumberController.text.trim(),
-          "password": passwordController.text.trim(),
+          'admission_number': admissionNumber,
+          'password': password,
         }),
       );
 
+      print(
+          'Login Response: ${response.statusCode} - ${response.body}'); // Debug
+
       if (response.statusCode == 200) {
-        final responseData = jsonDecode(response.body);
-        if (responseData.containsKey('user')) {
-          String token = responseData['token'];
-          Map<String, dynamic> userData = responseData['user'];
+        final data = jsonDecode(response.body);
+        SharedPreferences prefs = await SharedPreferences.getInstance();
+        await prefs.setString('jwt_token', data['token']);
+        await prefs.setString('role', data['user']['role']);
+        await prefs.setString('name', data['user']['username']);
+        await prefs.setString('email', data['user']['email']);
+        await prefs.setString('phone', data['user']['phone_number'] ?? 'N/A');
+        await prefs.setString(
+            'admission_number', data['user']['admission_number']);
 
-          await _saveUserData(userData, token);
-
-          debugPrint("✅ Passing User Data to HomeScreen: $userData");
-
-          _showMessage("Login Successful", Colors.green);
-
-          Future.delayed(const Duration(milliseconds: 500), () {
-            if (userData['role'] == 'admin') {
-              // ✅ Redirect admins to AdminDashboard
-              Navigator.pushReplacement(
-                context,
-                MaterialPageRoute(builder: (context) => const AdminDashboard()),
-              );
-            } else {
-              // ✅ Redirect students & teachers to HomeScreen
-              Navigator.pushReplacement(
-                context,
-                MaterialPageRoute(
-                    builder: (context) =>
-                        HomeScreen(userData: userData.cast<String, String>())),
-              );
-            }
-          });
+        if (data['user']['role'] == 'admin') {
+          Navigator.pushReplacement(
+            context,
+            MaterialPageRoute(builder: (context) => AdminDashboard()),
+          );
         } else {
-          _showMessage(
-              "Login Failed: Invalid response from server", Colors.red);
+          Navigator.pushReplacement(
+            context,
+            MaterialPageRoute(
+              builder: (context) => HomeScreen(userData: {
+                'name': data['user']['username'],
+                'email': data['user']['email'],
+                'phone': data['user']['phone_number'] ?? 'N/A',
+                'admission_number': data['user']['admission_number'],
+              }),
+            ),
+          );
         }
       } else {
-        final errorResponse = jsonDecode(response.body);
-        _showMessage(
-            "Login Failed: ${errorResponse['error'] ?? 'Invalid credentials'}",
-            Colors.red);
+        final errorData = jsonDecode(response.body);
+        _showMessage(errorData['error'] ?? 'Login failed', Colors.red);
       }
     } catch (e) {
-      _showMessage("Login Failed: Network error", Colors.red);
-      debugPrint("❌ Login Exception: $e");
+      _showMessage('Login failed: $e', Colors.red);
     }
 
     setState(() {
@@ -117,9 +124,8 @@ class LoginScreenState extends State<LoginScreen> {
   void _showMessage(String message, Color color) {
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
-        content: Text(message, style: const TextStyle(color: Colors.white)),
+        content: Text(message),
         backgroundColor: color,
-        duration: const Duration(seconds: 2),
       ),
     );
   }
@@ -127,79 +133,82 @@ class LoginScreenState extends State<LoginScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      body: SafeArea(
-        child: Padding(
-          padding: const EdgeInsets.all(16.0),
-          child: Form(
-            key: _formKey,
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                Text(
-                  'Campus Connect',
-                  style: TextStyle(
-                    fontSize: 32,
-                    fontWeight: FontWeight.bold,
-                    color: Theme.of(context).primaryColor,
+      body: isCheckingRole
+          ? const Center(child: CircularProgressIndicator())
+          : SafeArea(
+              child: Padding(
+                padding: const EdgeInsets.all(16.0),
+                child: Form(
+                  key: _formKey,
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      Text(
+                        'Campus Connect',
+                        style: TextStyle(
+                          fontSize: 32,
+                          fontWeight: FontWeight.bold,
+                          color: Theme.of(context).primaryColor,
+                        ),
+                        textAlign: TextAlign.center,
+                      ),
+                      const SizedBox(height: 40),
+                      TextFormField(
+                        controller: admissionNumberController,
+                        decoration: const InputDecoration(
+                          labelText: 'Admission Number',
+                          border: OutlineInputBorder(),
+                          prefixIcon: Icon(Icons.person),
+                        ),
+                        validator: (value) => value == null || value.isEmpty
+                            ? 'Please enter your admission number'
+                            : null,
+                      ),
+                      const SizedBox(height: 20),
+                      TextFormField(
+                        controller: passwordController,
+                        decoration: const InputDecoration(
+                          labelText: 'Password',
+                          border: OutlineInputBorder(),
+                          prefixIcon: Icon(Icons.lock),
+                        ),
+                        obscureText: true,
+                        validator: (value) => value == null || value.isEmpty
+                            ? 'Please enter your password'
+                            : null,
+                      ),
+                      const SizedBox(height: 20),
+                      ElevatedButton(
+                        onPressed: isLoading ? null : _login,
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: Theme.of(context).primaryColor,
+                        ),
+                        child: isLoading
+                            ? const CircularProgressIndicator(
+                                color: Colors.white)
+                            : const Text('Login',
+                                style: TextStyle(
+                                    fontSize: 18, color: Colors.white)),
+                      ),
+                      const SizedBox(height: 20),
+                      TextButton(
+                        onPressed: () {
+                          if (!admissionNumberController.text
+                              .endsWith("admin@mbcpeermade.com")) {
+                            Navigator.pushNamed(context, '/signup');
+                          } else {
+                            _showMessage(
+                                "Admins cannot sign up manually", Colors.red);
+                          }
+                        },
+                        child: const Text("Don't have an account? Sign Up"),
+                      ),
+                    ],
                   ),
-                  textAlign: TextAlign.center,
                 ),
-                const SizedBox(height: 40),
-                TextFormField(
-                  controller: admissionNumberController,
-                  decoration: const InputDecoration(
-                    labelText: 'Admission Number',
-                    border: OutlineInputBorder(),
-                    prefixIcon: Icon(Icons.person),
-                  ),
-                  validator: (value) => value == null || value.isEmpty
-                      ? 'Please enter your admission number'
-                      : null,
-                ),
-                const SizedBox(height: 20),
-                TextFormField(
-                  controller: passwordController,
-                  decoration: const InputDecoration(
-                    labelText: 'Password',
-                    border: OutlineInputBorder(),
-                    prefixIcon: Icon(Icons.lock),
-                  ),
-                  obscureText: true,
-                  validator: (value) => value == null || value.isEmpty
-                      ? 'Please enter your password'
-                      : null,
-                ),
-                const SizedBox(height: 20),
-                ElevatedButton(
-                  onPressed: isLoading ? null : _login,
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: Theme.of(context).primaryColor,
-                  ),
-                  child: isLoading
-                      ? const CircularProgressIndicator(color: Colors.white)
-                      : const Text('Login',
-                          style: TextStyle(fontSize: 18, color: Colors.white)),
-                ),
-                const SizedBox(height: 20),
-                TextButton(
-                  onPressed: () {
-                    if (!admissionNumberController.text
-                        .endsWith("admin@mbcpeermade.com")) {
-                      // ✅ Hide signup for admins
-                      Navigator.pushNamed(context, '/signup');
-                    } else {
-                      _showMessage(
-                          "Admins cannot sign up manually", Colors.red);
-                    }
-                  },
-                  child: const Text("Don't have an account? Sign Up"),
-                ),
-              ],
+              ),
             ),
-          ),
-        ),
-      ),
     );
   }
 }

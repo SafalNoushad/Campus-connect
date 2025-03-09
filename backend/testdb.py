@@ -8,7 +8,7 @@ try:
     db = mysql.connector.connect(
         host=os.getenv("MYSQL_HOST"),
         user=os.getenv("MYSQL_USER"),
-        password=os.getenv("MYSQL_PASSWORD"),
+        password=os.getenv("MYSQL_PASSWORD"),  # No encoding needed here
         database=os.getenv("MYSQL_DB")
     )
     cursor = db.cursor()

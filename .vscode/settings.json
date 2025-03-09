@@ -1,3 +1,4 @@
 {
-    "cmake.sourceDirectory": "/Users/rego/Desktop/Paid/Campus-coonect/frontend/linux"
+    "cmake.sourceDirectory": "/Users/rego/Desktop/Paid/Campus-coonect/frontend/linux",
+    "fileinator.ignoredFolders": []
 }

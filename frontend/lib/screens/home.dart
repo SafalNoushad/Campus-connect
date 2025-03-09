@@ -45,7 +45,7 @@ class HomeScreenState extends State<HomeScreen> {
   String _getTitle() {
     switch (_selectedIndex) {
       case 0:
-        return "Welcome, $userName!"; // ✅ Home Screen
+        return "Welcome, $userName"; // ✅ Home Screen
       case 1:
         return "Chatbot"; // ✅ Chatbot Page
       case 2:
@@ -71,7 +71,6 @@ class HomeScreenState extends State<HomeScreen> {
           IconButton(
             icon: const Icon(Icons.notifications), // ✅ Notification Icon
             onPressed: () {
-              // ✅ Navigate to notifications page (You can add a notifications screen later)
               ScaffoldMessenger.of(context).showSnackBar(
                 const SnackBar(content: Text("Notifications clicked!")),
               );
@@ -99,6 +98,7 @@ class HomeScreenState extends State<HomeScreen> {
   }
 }
 
+// ✅ Home Content Section with Welcome Message
 class HomeContent extends StatelessWidget {
   final Map<String, String> userData;
 
@@ -108,10 +108,77 @@ class HomeContent extends StatelessWidget {
   Widget build(BuildContext context) {
     String userName = userData['name'] ?? "Guest"; // Use 'name' from backend
 
-    return Center(
-      child: Text(
-        "Welcome, $userName!",
-        style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+    return SingleChildScrollView(
+      child: Padding(
+        padding: const EdgeInsets.all(16.0),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              'Welcome, $userName!', // ✅ Dynamic welcome message
+              style: TextStyle(
+                fontSize: 24,
+                fontWeight: FontWeight.bold,
+                color: Theme.of(context).primaryColor,
+              ),
+            ),
+            const SizedBox(height: 20),
+            Text(
+              'What would you like to do today?',
+              style: TextStyle(
+                fontSize: 18,
+                color: Theme.of(context).hintColor,
+              ),
+            ),
+            const SizedBox(height: 20),
+            GridView.count(
+              crossAxisCount: 2,
+              shrinkWrap: true,
+              physics: const NeverScrollableScrollPhysics(),
+              mainAxisSpacing: 16,
+              crossAxisSpacing: 16,
+              children: [
+                _buildFeatureCard(context, 'Subjects', Icons.book),
+                _buildFeatureCard(context, 'Exam Details', Icons.assignment),
+                _buildFeatureCard(context, 'Teachers Info', Icons.person),
+                _buildFeatureCard(context, 'Assignments', Icons.description),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildFeatureCard(BuildContext context, String title, IconData icon) {
+    return Card(
+      elevation: 4,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+      child: InkWell(
+        onTap: () {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('You tapped on $title')),
+          );
+        },
+        child: Padding(
+          padding: const EdgeInsets.all(16.0),
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(icon, size: 48, color: Theme.of(context).primaryColor),
+              const SizedBox(height: 12),
+              Text(
+                title,
+                style: TextStyle(
+                  fontSize: 16,
+                  fontWeight: FontWeight.bold,
+                  color: Theme.of(context).primaryColor,
+                ),
+                textAlign: TextAlign.center,
+              ),
+            ],
+          ),
+        ),
       ),
     );
   }
