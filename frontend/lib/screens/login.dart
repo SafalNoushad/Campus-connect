@@ -35,7 +35,8 @@ class LoginScreenState extends State<LoginScreen> {
         context,
         MaterialPageRoute(builder: (context) => AdminDashboard()),
       );
-    } else if (token != null && (role == 'student' || role == 'teacher')) {
+    } else if (token != null &&
+        (role == 'student' || role == 'staff' || role == 'hod')) {
       Navigator.pushReplacement(
         context,
         MaterialPageRoute(
@@ -76,8 +77,7 @@ class LoginScreenState extends State<LoginScreen> {
         }),
       );
 
-      print(
-          'Login Response: ${response.statusCode} - ${response.body}'); // Debug
+      print('Login Response: ${response.statusCode} - ${response.body}');
 
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body);
@@ -190,19 +190,6 @@ class LoginScreenState extends State<LoginScreen> {
                             : const Text('Login',
                                 style: TextStyle(
                                     fontSize: 18, color: Colors.white)),
-                      ),
-                      const SizedBox(height: 20),
-                      TextButton(
-                        onPressed: () {
-                          if (!admissionNumberController.text
-                              .endsWith("admin@mbcpeermade.com")) {
-                            Navigator.pushNamed(context, '/signup');
-                          } else {
-                            _showMessage(
-                                "Admins cannot sign up manually", Colors.red);
-                          }
-                        },
-                        child: const Text("Don't have an account? Sign Up"),
                       ),
                     ],
                   ),

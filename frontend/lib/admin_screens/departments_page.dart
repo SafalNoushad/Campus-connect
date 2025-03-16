@@ -2,10 +2,12 @@ import 'package:flutter/material.dart';
 import 'dart:convert';
 import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
-import '../utils/network_config.dart';
+import '../../utils/network_config.dart';
 import '../screens/admin_dashboard.dart';
 
 class DepartmentsPage extends StatefulWidget {
+  const DepartmentsPage({super.key}); // Added const constructor
+
   @override
   _DepartmentsPageState createState() => _DepartmentsPageState();
 }
@@ -30,8 +32,8 @@ class _DepartmentsPageState extends State<DepartmentsPage> {
         return;
       }
 
-      final url =
-          Uri.parse('${NetworkConfig.getBaseUrl()}/api/admin/departments');
+      final url = Uri.parse(
+          '${NetworkConfig.getBaseUrl()}/api/departments/departments');
       final response = await http.get(
         url,
         headers: {
@@ -72,8 +74,8 @@ class _DepartmentsPageState extends State<DepartmentsPage> {
         return;
       }
 
-      final url =
-          Uri.parse('${NetworkConfig.getBaseUrl()}/api/admin/departments');
+      final url = Uri.parse(
+          '${NetworkConfig.getBaseUrl()}/api/departments/departments');
       final response = await http.post(
         url,
         headers: {
@@ -86,8 +88,14 @@ class _DepartmentsPageState extends State<DepartmentsPage> {
         }),
       );
 
+      print(
+          'Create Department Response: ${response.statusCode} - ${response.body}');
+
       if (response.statusCode == 201) {
         await fetchDepartments();
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Department created successfully')),
+        );
       } else {
         setState(() {
           _errorMessage = 'Failed to create department: ${response.statusCode}';
@@ -110,8 +118,8 @@ class _DepartmentsPageState extends State<DepartmentsPage> {
         return;
       }
 
-      final url =
-          Uri.parse('${NetworkConfig.getBaseUrl()}/api/admin/departments/$id');
+      final url = Uri.parse(
+          '${NetworkConfig.getBaseUrl()}/api/departments/departments/$id');
       final response = await http.put(
         url,
         headers: {
@@ -124,8 +132,14 @@ class _DepartmentsPageState extends State<DepartmentsPage> {
         }),
       );
 
+      print(
+          'Update Department Response: ${response.statusCode} - ${response.body}');
+
       if (response.statusCode == 200) {
         await fetchDepartments();
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Department updated successfully')),
+        );
       } else {
         setState(() {
           _errorMessage = 'Failed to update department: ${response.statusCode}';
@@ -148,8 +162,8 @@ class _DepartmentsPageState extends State<DepartmentsPage> {
         return;
       }
 
-      final url =
-          Uri.parse('${NetworkConfig.getBaseUrl()}/api/admin/departments/$id');
+      final url = Uri.parse(
+          '${NetworkConfig.getBaseUrl()}/api/departments/departments/$id');
       final response = await http.delete(
         url,
         headers: {
@@ -158,11 +172,17 @@ class _DepartmentsPageState extends State<DepartmentsPage> {
         },
       );
 
+      print(
+          'Delete Department Response: ${response.statusCode} - ${response.body}');
+
       if (response.statusCode == 200) {
         setState(() {
           _departments.removeWhere((dept) => dept['id'] == id);
           _errorMessage = null;
         });
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Department deleted successfully')),
+        );
       } else {
         setState(() {
           _errorMessage = 'Failed to delete department: ${response.statusCode}';
@@ -208,6 +228,13 @@ class _DepartmentsPageState extends State<DepartmentsPage> {
             ),
             TextButton(
               onPressed: () async {
+                if (codeController.text.isEmpty ||
+                    nameController.text.isEmpty) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(content: Text("Please fill all fields")),
+                  );
+                  return;
+                }
                 await createDepartment(
                     codeController.text, nameController.text);
                 Navigator.pop(context);
@@ -251,6 +278,13 @@ class _DepartmentsPageState extends State<DepartmentsPage> {
             ),
             TextButton(
               onPressed: () async {
+                if (codeController.text.isEmpty ||
+                    nameController.text.isEmpty) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(content: Text("Please fill all fields")),
+                  );
+                  return;
+                }
                 await updateDepartment(
                     department['id'], codeController.text, nameController.text);
                 Navigator.pop(context);

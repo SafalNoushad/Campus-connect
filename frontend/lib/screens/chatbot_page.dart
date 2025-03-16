@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
 import 'package:shared_preferences/shared_preferences.dart';
-import '../utils/network_config.dart';
 import 'package:file_picker/file_picker.dart';
 
 class ChatbotPage extends StatefulWidget {
@@ -33,7 +32,6 @@ class _ChatbotPageState extends State<ChatbotPage> {
     if (chatData != null) {
       setState(() {
         _chatSessions = List<Map<String, dynamic>>.from(jsonDecode(chatData));
-        // Ensure messages are properly typed when loading
         for (var session in _chatSessions) {
           if (session['messages'] != null) {
             session['messages'] = List<Map<String, String>>.from(
@@ -41,7 +39,6 @@ class _ChatbotPageState extends State<ChatbotPage> {
                     .map((msg) => Map<String, String>.from(msg)));
           }
         }
-        // Load the first chat if available
         if (_chatSessions.isNotEmpty && _selectedChatIndex == -1) {
           _selectedChatIndex = 0;
           _chatTitle = _chatSessions[0]['name'] ?? "Chat 1";
@@ -54,7 +51,6 @@ class _ChatbotPageState extends State<ChatbotPage> {
 
   Future<void> _saveChatHistory() async {
     final prefs = await SharedPreferences.getInstance();
-    // Create a deep copy of chat sessions to ensure proper serialization
     final sessionsToSave = _chatSessions.map((session) {
       return {
         'name': session['name'],
@@ -64,40 +60,84 @@ class _ChatbotPageState extends State<ChatbotPage> {
     await prefs.setString('chat_sessions', jsonEncode(sessionsToSave));
   }
 
-  Future<void> _sendMessage() async {
-    String userMessage = _messageController.text.trim();
-    if (userMessage.isEmpty) return;
+  Future<void> _sendMessage({PlatformFile? file}) async {
+    final userMessage = _messageController.text.trim();
+    if (userMessage.isEmpty && file == null) return;
+
+    final prefs = await SharedPreferences.getInstance();
+    final token = prefs.getString('jwt_token');
+    if (token == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text("Please log in first")),
+      );
+      Navigator.pushReplacementNamed(context, '/login');
+      return;
+    }
 
     setState(() {
-      _messages.add({"sender": "user", "text": userMessage});
+      if (userMessage.isNotEmpty) {
+        _messages.add({"sender": "user", "text": userMessage});
+      }
+      if (file != null) {
+        _messages.add({"sender": "user", "text": "Uploaded: ${file.name}"});
+      }
       _isLoading = true;
     });
-
     _messageController.clear();
     _scrollToBottom();
 
     try {
-      final response = await http.post(
-        Uri.parse("${NetworkConfig.getBaseUrl()}/api/chat"),
-        headers: {"Content-Type": "application/json"},
-        body: jsonEncode({"message": userMessage}),
+      var request = http.MultipartRequest(
+        'POST',
+        Uri.parse("http://localhost:5001/api/chatbot/chat"),
       );
+      request.headers['Authorization'] = 'Bearer $token';
+
+      if (userMessage.isNotEmpty) request.fields['message'] = userMessage;
+      if (file != null) {
+        if (file.size > 10 * 1024 * 1024) {
+          // 10MB limit
+          throw Exception("File size exceeds 10MB limit");
+        }
+        request.files
+            .add(await http.MultipartFile.fromPath('file', file.path!));
+      }
+
+      final response =
+          await request.send().timeout(const Duration(seconds: 30));
+      final responseBody = await http.Response.fromStream(response);
 
       if (response.statusCode == 200) {
-        final responseData = jsonDecode(response.body);
+        final responseData = jsonDecode(responseBody.body);
         setState(() {
-          _messages.add({"sender": "bot", "text": responseData["response"]});
+          if (responseData.containsKey("summary")) {
+            _messages.add({
+              "sender": "bot",
+              "text": "Summary: ${responseData['summary']}"
+            });
+            _messages.add({
+              "sender": "bot",
+              "text": "Description: ${responseData['description']}"
+            });
+          } else {
+            final botResponse =
+                responseData["response"] ?? "No response from server";
+            _messages.add({"sender": "bot", "text": botResponse});
+          }
         });
       } else {
+        final errorData = jsonDecode(responseBody.body);
         setState(() {
-          _messages
-              .add({"sender": "bot", "text": "Error: Unable to get response"});
+          _messages.add({
+            "sender": "bot",
+            "text":
+                "Error: ${errorData['error'] ?? 'Status ${response.statusCode}'}"
+          });
         });
       }
     } catch (e) {
       setState(() {
-        _messages
-            .add({"sender": "bot", "text": "Error: No internet connection"});
+        _messages.add({"sender": "bot", "text": "Error: ${e.toString()}"});
       });
     } finally {
       setState(() => _isLoading = false);
@@ -141,7 +181,7 @@ class _ChatbotPageState extends State<ChatbotPage> {
                   _chatTitle = _renameController.text;
                   if (_selectedChatIndex != -1) {
                     _chatSessions[_selectedChatIndex]["name"] = _chatTitle;
-                  } else {
+                  } else if (_messages.isNotEmpty) {
                     _chatSessions
                         .add({"name": _chatTitle, "messages": _messages});
                     _selectedChatIndex = _chatSessions.length - 1;
@@ -159,15 +199,13 @@ class _ChatbotPageState extends State<ChatbotPage> {
   }
 
   void _updateChatSessions() {
-    if (_selectedChatIndex == -1) {
-      if (_messages.isNotEmpty) {
-        _chatSessions.add({
-          "name": _chatTitle,
-          "messages": List<Map<String, String>>.from(_messages)
-        });
-        _selectedChatIndex = _chatSessions.length - 1;
-      }
-    } else {
+    if (_selectedChatIndex == -1 && _messages.isNotEmpty) {
+      _chatSessions.add({
+        "name": _chatTitle,
+        "messages": List<Map<String, String>>.from(_messages)
+      });
+      _selectedChatIndex = _chatSessions.length - 1;
+    } else if (_selectedChatIndex != -1) {
       _chatSessions[_selectedChatIndex]["messages"] =
           List<Map<String, String>>.from(_messages);
     }
@@ -179,22 +217,16 @@ class _ChatbotPageState extends State<ChatbotPage> {
       context: context,
       builder: (context) {
         return AlertDialog(
-          title: const Text("Upload File"),
-          content: const Text("Choose the type of file to upload:"),
+          title: const Text("Upload PDF"),
+          content:
+              const Text("Please upload a PDF file (max 10MB) to summarize."),
           actions: [
             TextButton(
               onPressed: () {
                 Navigator.pop(context);
-                _uploadFile('image');
+                _uploadFile();
               },
-              child: const Text("Image"),
-            ),
-            TextButton(
-              onPressed: () {
-                Navigator.pop(context);
-                _uploadFile('pdf');
-              },
-              child: const Text("PDF"),
+              child: const Text("Upload"),
             ),
             TextButton(
               onPressed: () => Navigator.pop(context),
@@ -206,48 +238,15 @@ class _ChatbotPageState extends State<ChatbotPage> {
     );
   }
 
-  Future<void> _uploadFile(String type) async {
-    FilePickerResult? result;
-    if (type == 'image') {
-      result = await FilePicker.platform.pickFiles(
-        type: FileType.image,
-      );
-    } else if (type == 'pdf') {
-      result = await FilePicker.platform.pickFiles(
-        allowedExtensions: ['pdf'],
-        type: FileType.custom,
-      );
-    }
+  Future<void> _uploadFile() async {
+    FilePickerResult? result = await FilePicker.platform.pickFiles(
+      allowedExtensions: ['pdf'],
+      type: FileType.custom,
+    );
 
     if (result != null && result.files.isNotEmpty) {
-      setState(() {
-        _messages.add({
-          "sender": "user",
-          "text":
-              "Uploading ${type == 'image' ? 'image' : 'PDF'}: ${result?.files.single.name}"
-        });
-        _isLoading = true;
-      });
-      _scrollToBottom();
-
-      try {
-        await Future.delayed(const Duration(seconds: 1));
-        setState(() {
-          _messages.add({
-            "sender": "bot",
-            "text":
-                "${type == 'image' ? 'Image' : 'PDF'} received and processed successfully"
-          });
-        });
-      } catch (e) {
-        setState(() {
-          _messages.add({"sender": "bot", "text": "Error uploading $type: $e"});
-        });
-      } finally {
-        setState(() => _isLoading = false);
-        _scrollToBottom();
-        _updateChatSessions();
-      }
+      final file = result.files.single;
+      await _sendMessage(file: file);
     }
   }
 
@@ -346,7 +345,6 @@ class _ChatbotPageState extends State<ChatbotPage> {
       itemBuilder: (context, index) {
         final message = _messages[index];
         final isUser = message['sender'] == 'user';
-
         return Align(
           alignment: isUser ? Alignment.centerRight : Alignment.centerLeft,
           child: Container(
@@ -358,9 +356,7 @@ class _ChatbotPageState extends State<ChatbotPage> {
             ),
             child: Text(
               message['text'] ?? '',
-              style: TextStyle(
-                color: isUser ? Colors.white : Colors.black87,
-              ),
+              style: TextStyle(color: isUser ? Colors.white : Colors.black87),
             ),
           ),
         );
@@ -393,7 +389,7 @@ class _ChatbotPageState extends State<ChatbotPage> {
           ),
           IconButton(
             icon: const Icon(Icons.send, color: Colors.blueAccent),
-            onPressed: _sendMessage,
+            onPressed: () => _sendMessage(),
           ),
         ],
       ),

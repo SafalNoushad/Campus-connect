@@ -2,11 +2,11 @@ import 'package:flutter/material.dart';
 import 'dart:convert';
 import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
-import '../utils/network_config.dart';
+import '../../utils/network_config.dart';
 import '../screens/admin_dashboard.dart';
 
 class UsersPage extends StatefulWidget {
-  const UsersPage({super.key}); // Added const constructor
+  const UsersPage({super.key});
 
   @override
   _UsersPageState createState() => _UsersPageState();
@@ -68,7 +68,7 @@ class _UsersPageState extends State<UsersPage> {
       }
 
       final response = await http.get(
-        Uri.parse('${NetworkConfig.getBaseUrl()}/api/admin/departments'),
+        Uri.parse('${NetworkConfig.getBaseUrl()}/api/departments/departments'),
         headers: {
           'Authorization': 'Bearer $token',
           'Content-Type': 'application/json',
@@ -110,7 +110,7 @@ class _UsersPageState extends State<UsersPage> {
       );
 
       if (response.statusCode == 201) {
-        await fetchUsers(); // Refresh user list
+        await fetchUsers();
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(content: Text('User registered successfully')),
         );
@@ -133,21 +133,17 @@ class _UsersPageState extends State<UsersPage> {
   void showRegisterDialog() {
     TextEditingController admissionController = TextEditingController();
     TextEditingController usernameController = TextEditingController();
-    TextEditingController emailController = TextEditingController();
     TextEditingController phoneController = TextEditingController();
-    TextEditingController batchController =
-        TextEditingController(); // Added for batch
-    String role = 'student'; // Default role
-    String? departmentcode = _departments.isNotEmpty
-        ? _departments[0]['departmentcode']
-        : null; // Default to first department
+    TextEditingController batchController = TextEditingController();
+    String role = 'student';
+    String? departmentcode =
+        _departments.isNotEmpty ? _departments[0]['departmentcode'] : null;
 
     showDialog(
       context: context,
       builder: (context) {
         return StatefulBuilder(
           builder: (dialogContext, setDialogState) {
-            // Renamed setState to avoid confusion
             return AlertDialog(
               title: const Text("Register User"),
               content: SingleChildScrollView(
@@ -164,17 +160,13 @@ class _UsersPageState extends State<UsersPage> {
                       decoration: const InputDecoration(labelText: "Username"),
                     ),
                     TextField(
-                      controller: emailController,
-                      decoration: const InputDecoration(labelText: "Email"),
-                    ),
-                    TextField(
                       controller: phoneController,
                       decoration: const InputDecoration(
                           labelText: "Phone Number (Optional)"),
                     ),
                     DropdownButtonFormField<String>(
                       value: role,
-                      items: ['student', 'teacher', 'hod']
+                      items: ['admin', 'hod', 'staff', 'student']
                           .map(
                               (r) => DropdownMenuItem(value: r, child: Text(r)))
                           .toList(),
@@ -222,7 +214,6 @@ class _UsersPageState extends State<UsersPage> {
                   onPressed: () async {
                     if (admissionController.text.isEmpty ||
                         usernameController.text.isEmpty ||
-                        emailController.text.isEmpty ||
                         departmentcode == null) {
                       ScaffoldMessenger.of(context).showSnackBar(
                         const SnackBar(
@@ -233,7 +224,6 @@ class _UsersPageState extends State<UsersPage> {
                     await registerUser({
                       'admission_number': admissionController.text,
                       'username': usernameController.text,
-                      'email': emailController.text,
                       'phone_number': phoneController.text.isEmpty
                           ? null
                           : phoneController.text,
@@ -263,8 +253,7 @@ class _UsersPageState extends State<UsersPage> {
           onPressed: () {
             Navigator.pushReplacement(
               context,
-              MaterialPageRoute(
-                  builder: (context) => AdminDashboard()), // Added const
+              MaterialPageRoute(builder: (context) => AdminDashboard()),
             );
           },
         ),

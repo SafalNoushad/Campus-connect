@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'screens/splash.dart';
 import 'screens/login.dart';
-import 'screens/signup.dart';
 import 'screens/home.dart';
 import 'screens/chatbot_page.dart';
 import 'screens/admin_dashboard.dart';
@@ -35,7 +34,7 @@ class MyAppState extends State<MyApp> {
     await Future.delayed(const Duration(seconds: 2));
 
     setState(() {
-      jwtToken = prefs.getString('jwt_token'); // Updated key
+      jwtToken = prefs.getString('jwt_token');
       userData = {
         "name": prefs.getString('name') ?? "Guest",
         "email": prefs.getString('email') ?? "N/A",
@@ -68,7 +67,6 @@ class MyAppState extends State<MyApp> {
                   : HomeScreen(userData: userData),
       routes: {
         '/login': (context) => LoginScreen(),
-        '/signup': (context) => const SignUpScreen(),
         '/home': (context) => HomeScreen(
               userData: (ModalRoute.of(context)?.settings.arguments
                       as Map<String, String>?) ??
