@@ -5,8 +5,9 @@ import 'screens/login.dart';
 import 'screens/home.dart';
 import 'screens/chatbot.dart';
 import 'screens/admin_dashboard.dart';
-import 'staff_screens/staff_dashboard.dart'; // Add StaffDashboard import
-import 'hod_screens/hod_dashboard.dart'; // Add HodDashboard import
+import 'staff_screens/staff_dashboard.dart';
+import 'hod_screens/hod_dashboard.dart';
+import 'admin_screens/departments_page.dart';
 
 void main() {
   runApp(const MyApp());
@@ -31,27 +32,61 @@ class MyAppState extends State<MyApp> {
   }
 
   Future<void> _loadUserData() async {
-    SharedPreferences prefs = await SharedPreferences.getInstance();
+    try {
+      SharedPreferences prefs = await SharedPreferences.getInstance();
 
-    await Future.delayed(const Duration(seconds: 2));
+      debugPrint(
+          'Starting _loadUserData - All SharedPreferences keys: ${prefs.getKeys()}');
+      debugPrint(
+          'Raw user_role from SharedPreferences: ${prefs.getString('user_role')}');
+      debugPrint(
+          'Raw jwt_token from SharedPreferences: ${prefs.getString('jwt_token')}');
 
-    setState(() {
-      jwtToken = prefs.getString('jwt_token');
-      userData = {
-        "name": prefs.getString('name') ?? "Guest",
-        "email": prefs.getString('email') ?? "N/A",
-        "phone": prefs.getString('phone') ?? "N/A",
-        "admission_number": prefs.getString('admission_number') ?? "N/A",
-        "role": prefs.getString('role') ?? "N/A",
-      };
-      isLoading = false;
-    });
+      // Ensure splash screen is visible for at least 2 seconds
+      await Future.delayed(const Duration(seconds: 2));
 
-    debugPrint("✅ Loaded User Data: $userData");
+      setState(() {
+        jwtToken = prefs.getString('jwt_token');
+        String? rawRole = prefs.getString('user_role');
+        userData = {
+          "name": prefs.getString('username') ?? "Guest",
+          "email": prefs.getString('email') ?? "N/A",
+          "phone": prefs.getString('phone') ?? "N/A",
+          "admission_number": prefs.getString('admission_number') ?? "N/A",
+          "role": rawRole ?? "N/A",
+        };
+        debugPrint('After setState - userData[role]: ${userData['role']}');
+        isLoading = false;
+      });
+
+      debugPrint("✅ Loaded User Data: $userData");
+    } catch (e) {
+      debugPrint('Error loading user data: $e');
+      setState(() {
+        isLoading = false; // Proceed to login screen on error
+      });
+    }
   }
 
   @override
   Widget build(BuildContext context) {
+    debugPrint('Building MyApp - isLoading: $isLoading, jwtToken: $jwtToken');
+    if (isLoading) {
+      return MaterialApp(
+        title: 'Campus Connect',
+        theme: ThemeData(
+          primaryColor: const Color(0xFF0C6170),
+          hintColor: const Color(0xFF37BEB0),
+          scaffoldBackgroundColor: const Color(0xFFDBF5F0),
+        ),
+        debugShowCheckedModeBanner: false,
+        home: const SplashScreen(),
+      );
+    }
+
+    Widget homeScreen =
+        jwtToken == null ? LoginScreen() : _getHomeScreenBasedOnRole();
+
     return MaterialApp(
       title: 'Campus Connect',
       theme: ThemeData(
@@ -60,11 +95,7 @@ class MyAppState extends State<MyApp> {
         scaffoldBackgroundColor: const Color(0xFFDBF5F0),
       ),
       debugShowCheckedModeBanner: false,
-      home: isLoading
-          ? const SplashScreen()
-          : jwtToken == null
-              ? LoginScreen()
-              : _getHomeScreenBasedOnRole(), // Updated to handle all roles
+      home: homeScreen,
       routes: {
         '/login': (context) => LoginScreen(),
         '/home': (context) => HomeScreen(
@@ -73,12 +104,13 @@ class MyAppState extends State<MyApp> {
                   {"name": "Guest"},
             ),
         '/chatbot': (context) => ChatbotPage(),
+        '/departments': (context) => const DepartmentPage(),
       },
     );
   }
 
-  // New method to determine the home screen based on role
   Widget _getHomeScreenBasedOnRole() {
+    debugPrint("Navigating based on role: ${userData['role']}");
     switch (userData['role']) {
       case 'admin':
         return AdminDashboard();
@@ -86,10 +118,10 @@ class MyAppState extends State<MyApp> {
         return const StaffDashboard();
       case 'hod':
         return const HodDashboard();
-      case 'student': // Explicitly handle student role
+      case 'student':
         return HomeScreen(userData: userData);
       default:
-        return LoginScreen(); // Fallback to login for unknown roles
+        return LoginScreen();
     }
   }
 }

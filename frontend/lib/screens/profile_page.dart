@@ -18,11 +18,11 @@ class _ProfilePageState extends State<ProfilePage> {
   String role = "";
   String email = "";
   String phone = "";
-  String name = "User";
+  String username = "User";
   String department = "";
   String profileImagePath = "";
 
-  final TextEditingController nameController = TextEditingController();
+  final TextEditingController usernameController = TextEditingController();
   final TextEditingController emailController = TextEditingController();
   final TextEditingController phoneController = TextEditingController();
   final TextEditingController otpController = TextEditingController();
@@ -38,30 +38,68 @@ class _ProfilePageState extends State<ProfilePage> {
     SharedPreferences prefs = await SharedPreferences.getInstance();
     setState(() {
       admissionNumber = prefs.getString('admission_number') ?? "N/A";
-      role = prefs.getString('role') ?? "N/A";
+      role = prefs.getString('user_role') ?? "N/A";
       email = prefs.getString('email') ?? "N/A";
-      phone = prefs.getString('phone') ?? "N/A";
-      name = prefs.getString('name') ?? "User";
-      department = prefs.getString('department') ?? "Unknown";
+      phone = prefs.getString('phone_number') ?? "N/A";
+      username = prefs.getString('username') ?? "User";
+      department = prefs.getString('departmentcode') ?? "Unknown";
       profileImagePath = prefs.getString('profile_image') ?? "";
     });
 
-    nameController.text = name;
+    usernameController.text = username;
     emailController.text = email;
     phoneController.text = phone;
   }
 
   Future<void> _updateUserData() async {
     SharedPreferences prefs = await SharedPreferences.getInstance();
-    await prefs.setString('name', nameController.text);
-    await prefs.setString('phone', phoneController.text);
+    String? token = prefs.getString('jwt_token');
 
-    setState(() {
-      name = nameController.text;
-      phone = phoneController.text;
-    });
+    if (token == null) {
+      Navigator.pushReplacementNamed(context, '/login');
+      return;
+    }
 
-    Navigator.pop(context);
+    // Update local SharedPreferences
+    await prefs.setString('username', usernameController.text);
+    await prefs.setString('phone_number', phoneController.text);
+
+    // Update backend
+    try {
+      final response = await http.put(
+        Uri.parse('${NetworkConfig.getBaseUrl()}/api/users/update_profile'),
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer $token',
+        },
+        body: jsonEncode({
+          'admission_number': admissionNumber,
+          'username': usernameController.text,
+          'phone_number': phoneController.text,
+        }),
+      );
+
+      if (response.statusCode == 200) {
+        setState(() {
+          username = usernameController.text;
+          phone = phoneController.text;
+        });
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Profile updated successfully')),
+        );
+        Navigator.pop(context);
+      } else {
+        final errorData = jsonDecode(response.body);
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+              content: Text('Failed to update profile: ${errorData['error']}')),
+        );
+      }
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Error updating profile: $e')),
+      );
+    }
   }
 
   Future<void> _requestOtp() async {
@@ -144,7 +182,7 @@ class _ProfilePageState extends State<ProfilePage> {
   Future<void> _logout() async {
     SharedPreferences prefs = await SharedPreferences.getInstance();
     await prefs.clear();
-    Navigator.of(context).pushReplacementNamed('/login');
+    Navigator.pushReplacementNamed(context, '/login');
   }
 
   Future<void> _pickProfileImage() async {
@@ -163,41 +201,76 @@ class _ProfilePageState extends State<ProfilePage> {
 
   @override
   Widget build(BuildContext context) {
-    return SingleChildScrollView(
+    return Scaffold(
+      body: SingleChildScrollView(
+        child: Column(
+          children: [
+            _buildProfileHeader(),
+            const SizedBox(height: 20),
+            _buildInfoCard(),
+            const SizedBox(height: 20),
+            _buildActionButtons(),
+            const SizedBox(height: 20),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildProfileHeader() {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(16.0),
+      decoration: BoxDecoration(
+        color: Theme.of(context).primaryColor,
+        borderRadius: const BorderRadius.only(
+          bottomLeft: Radius.circular(30),
+          bottomRight: Radius.circular(30),
+        ),
+      ),
       child: Column(
         children: [
-          const SizedBox(height: 20),
           GestureDetector(
             onTap: _pickProfileImage,
-            child: CircleAvatar(
-              radius: 50,
-              backgroundImage: profileImagePath.isNotEmpty
-                  ? FileImage(File(profileImagePath)) as ImageProvider
-                  : const AssetImage('assets/default_profile.png'),
-              child: Align(
-                alignment: Alignment.bottomRight,
-                child: CircleAvatar(
+            child: Stack(
+              alignment: Alignment.bottomRight,
+              children: [
+                CircleAvatar(
+                  radius: 60,
                   backgroundColor: Colors.white,
-                  radius: 15,
-                  child: Icon(Icons.camera_alt,
-                      color: Theme.of(context).primaryColor, size: 20),
+                  backgroundImage: profileImagePath.isNotEmpty
+                      ? FileImage(File(profileImagePath)) as ImageProvider
+                      : const AssetImage('assets/default_profile.png'),
                 ),
-              ),
+                CircleAvatar(
+                  radius: 18,
+                  backgroundColor: Colors.white,
+                  child: Icon(
+                    Icons.camera_alt,
+                    color: Theme.of(context).primaryColor,
+                    size: 24,
+                  ),
+                ),
+              ],
             ),
           ),
-          const SizedBox(height: 10),
+          const SizedBox(height: 12),
           Text(
-            name,
-            style: const TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
+            username,
+            style: const TextStyle(
+              fontSize: 28,
+              fontWeight: FontWeight.bold,
+              color: Colors.white,
+            ),
           ),
+          const SizedBox(height: 4),
           Text(
             '$department - ${role.toUpperCase()}',
-            style: const TextStyle(fontSize: 16, color: Colors.grey),
+            style: const TextStyle(
+              fontSize: 16,
+              color: Colors.white70,
+            ),
           ),
-          const SizedBox(height: 20),
-          _buildInfoCard(),
-          const SizedBox(height: 20),
-          _buildActionButtons(),
         ],
       ),
     );
@@ -206,67 +279,99 @@ class _ProfilePageState extends State<ProfilePage> {
   Widget _buildInfoCard() {
     return Card(
       margin: const EdgeInsets.symmetric(horizontal: 16.0),
+      elevation: 4,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
       child: Padding(
         padding: const EdgeInsets.all(16.0),
         child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            _buildInfoRow(Icons.email, email),
+            const Text(
+              'Personal Information',
+              style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+            ),
+            const SizedBox(height: 12),
+            _buildInfoRow(Icons.email, 'Email', email),
             const Divider(),
-            _buildInfoRow(Icons.phone, phone),
+            _buildInfoRow(Icons.phone, 'Phone', phone),
             const Divider(),
-            _buildInfoRow(Icons.school, 'Admission No: $admissionNumber'),
+            _buildInfoRow(Icons.school, 'Admission No', admissionNumber),
           ],
         ),
       ),
     );
   }
 
-  Widget _buildInfoRow(IconData icon, String text) {
+  Widget _buildInfoRow(IconData icon, String label, String value) {
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 8.0),
       child: Row(
         children: [
-          Icon(icon, color: Colors.grey),
-          const SizedBox(width: 10),
-          Text(text),
+          Icon(icon, color: Theme.of(context).primaryColor, size: 24),
+          const SizedBox(width: 12),
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                label,
+                style: const TextStyle(fontSize: 12, color: Colors.grey),
+              ),
+              Text(
+                value,
+                style: const TextStyle(fontSize: 16),
+              ),
+            ],
+          ),
         ],
       ),
     );
   }
 
   Widget _buildActionButtons() {
-    return Column(
-      children: [
-        ElevatedButton(
-          onPressed: _showEditProfileDialog,
-          style: ElevatedButton.styleFrom(
-            backgroundColor: Theme.of(context).primaryColor,
-            foregroundColor: Colors.white,
-            minimumSize: const Size(200, 40),
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 16.0),
+      child: Column(
+        children: [
+          ElevatedButton.icon(
+            onPressed: _showEditProfileDialog,
+            icon: const Icon(Icons.edit),
+            label: const Text('Edit Profile'),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Theme.of(context).primaryColor,
+              foregroundColor: Colors.white,
+              minimumSize: const Size(double.infinity, 50),
+              shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12)),
+            ),
           ),
-          child: const Text('Edit Profile'),
-        ),
-        const SizedBox(height: 10),
-        ElevatedButton(
-          onPressed: _requestOtp,
-          style: ElevatedButton.styleFrom(
-            backgroundColor: Colors.orange,
-            foregroundColor: Colors.white,
-            minimumSize: const Size(200, 40),
+          const SizedBox(height: 12),
+          ElevatedButton.icon(
+            onPressed: _requestOtp,
+            icon: const Icon(Icons.lock),
+            label: const Text('Change Password'),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.orange,
+              foregroundColor: Colors.white,
+              minimumSize: const Size(double.infinity, 50),
+              shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12)),
+            ),
           ),
-          child: const Text('Change Password'),
-        ),
-        const SizedBox(height: 10),
-        ElevatedButton(
-          onPressed: _logout,
-          style: ElevatedButton.styleFrom(
-            backgroundColor: Colors.red,
-            foregroundColor: Colors.white,
-            minimumSize: const Size(200, 40),
+          const SizedBox(height: 12),
+          ElevatedButton.icon(
+            onPressed: _logout,
+            icon: const Icon(Icons.logout),
+            label: const Text('Logout'),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.red,
+              foregroundColor: Colors.white,
+              minimumSize: const Size(double.infinity, 50),
+              shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12)),
+            ),
           ),
-          child: const Text('Logout'),
-        ),
-      ],
+        ],
+      ),
     );
   }
 
@@ -274,32 +379,70 @@ class _ProfilePageState extends State<ProfilePage> {
     showDialog(
       context: context,
       builder: (context) {
-        return AlertDialog(
-          title: const Text("Edit Profile"),
-          content: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              TextFormField(
-                controller: nameController,
-                decoration: const InputDecoration(labelText: "Name"),
-              ),
-              const SizedBox(height: 10),
-              TextFormField(
-                controller: phoneController,
-                decoration: const InputDecoration(labelText: "Phone"),
-              ),
-            ],
+        return Dialog(
+          shape:
+              RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+          elevation: 4,
+          child: Padding(
+            padding: const EdgeInsets.all(20.0),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text(
+                  'Edit Profile',
+                  style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+                ),
+                const SizedBox(height: 16),
+                TextFormField(
+                  controller: usernameController,
+                  decoration: InputDecoration(
+                    labelText: 'Username',
+                    prefixIcon: const Icon(Icons.person),
+                    border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(12)),
+                    filled: true,
+                    fillColor: Colors.grey[100],
+                  ),
+                ),
+                const SizedBox(height: 12),
+                TextFormField(
+                  controller: phoneController,
+                  decoration: InputDecoration(
+                    labelText: 'Phone Number',
+                    prefixIcon: const Icon(Icons.phone),
+                    border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(12)),
+                    filled: true,
+                    fillColor: Colors.grey[100],
+                  ),
+                  keyboardType: TextInputType.phone,
+                ),
+                const SizedBox(height: 20),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.end,
+                  children: [
+                    TextButton(
+                      onPressed: () => Navigator.pop(context),
+                      child: const Text('Cancel',
+                          style: TextStyle(color: Colors.grey)),
+                    ),
+                    const SizedBox(width: 8),
+                    ElevatedButton(
+                      onPressed: _updateUserData,
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: Theme.of(context).primaryColor,
+                        foregroundColor: Colors.white,
+                        shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(12)),
+                      ),
+                      child: const Text('Save'),
+                    ),
+                  ],
+                ),
+              ],
+            ),
           ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(context),
-              child: const Text("Cancel"),
-            ),
-            ElevatedButton(
-              onPressed: _updateUserData,
-              child: const Text("Save"),
-            ),
-          ],
         );
       },
     );
@@ -309,33 +452,71 @@ class _ProfilePageState extends State<ProfilePage> {
     showDialog(
       context: context,
       builder: (context) {
-        return AlertDialog(
-          title: const Text("Reset Password"),
-          content: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              TextFormField(
-                controller: otpController,
-                decoration: const InputDecoration(labelText: "Enter OTP"),
-              ),
-              const SizedBox(height: 10),
-              TextFormField(
-                controller: newPasswordController,
-                decoration: const InputDecoration(labelText: "New Password"),
-                obscureText: true,
-              ),
-            ],
+        return Dialog(
+          shape:
+              RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+          elevation: 4,
+          child: Padding(
+            padding: const EdgeInsets.all(20.0),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text(
+                  'Reset Password',
+                  style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+                ),
+                const SizedBox(height: 16),
+                TextFormField(
+                  controller: otpController,
+                  decoration: InputDecoration(
+                    labelText: 'Enter OTP',
+                    prefixIcon: const Icon(Icons.mail),
+                    border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(12)),
+                    filled: true,
+                    fillColor: Colors.grey[100],
+                  ),
+                  keyboardType: TextInputType.number,
+                ),
+                const SizedBox(height: 12),
+                TextFormField(
+                  controller: newPasswordController,
+                  decoration: InputDecoration(
+                    labelText: 'New Password',
+                    prefixIcon: const Icon(Icons.lock),
+                    border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(12)),
+                    filled: true,
+                    fillColor: Colors.grey[100],
+                  ),
+                  obscureText: true,
+                ),
+                const SizedBox(height: 20),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.end,
+                  children: [
+                    TextButton(
+                      onPressed: () => Navigator.pop(context),
+                      child: const Text('Cancel',
+                          style: TextStyle(color: Colors.grey)),
+                    ),
+                    const SizedBox(width: 8),
+                    ElevatedButton(
+                      onPressed: _resetPassword,
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: Theme.of(context).primaryColor,
+                        foregroundColor: Colors.white,
+                        shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(12)),
+                      ),
+                      child: const Text('Reset'),
+                    ),
+                  ],
+                ),
+              ],
+            ),
           ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(context),
-              child: const Text("Cancel"),
-            ),
-            ElevatedButton(
-              onPressed: _resetPassword,
-              child: const Text("Reset"),
-            ),
-          ],
         );
       },
     );

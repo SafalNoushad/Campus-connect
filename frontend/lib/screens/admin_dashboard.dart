@@ -120,8 +120,7 @@ class _AdminDashboardState extends State<AdminDashboard> {
               Navigator.pop(context); // Close drawer
               Navigator.push(
                 context,
-                MaterialPageRoute(
-                    builder: (context) => const DepartmentsPage()),
+                MaterialPageRoute(builder: (context) => const DepartmentPage()),
               );
             },
           ),

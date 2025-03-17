@@ -4,6 +4,7 @@ from database import db
 from models import User
 from functools import wraps
 import bcrypt
+import re
 
 admin = Blueprint('admin', __name__)
 
@@ -26,28 +27,33 @@ def get_users():
     except Exception as e:
         return jsonify({'error': 'Failed to fetch users', 'details': str(e)}), 500
 
-@admin.route('/register_user', methods=['POST'])
+@admin.route('/add_user', methods=['POST'])
 @admin_required
 def register_user():
     try:
         data = request.json
         admission_number = data.get('admission_number')
         username = data.get('username')
+        email = data.get('email')  # Accept email from request instead of generating
+        password = data.get('password')  # Accept password from request
         role = data.get('role')
         departmentcode = data.get('departmentcode')
         batch = data.get('batch') if role == 'student' else None
         phone_number = data.get('phone_number')
 
-        if not all([admission_number, username, role, departmentcode]):
+        # Validate required fields
+        if not all([admission_number, username, email, password, role, departmentcode]):
             return jsonify({'error': 'Missing required fields'}), 400
 
+        # Validate role
         if role not in ['admin', 'hod', 'staff', 'student']:
             return jsonify({'error': 'Invalid role value'}), 400
 
-        email = f"{admission_number}@mbcpeermade.com"
-        default_password = "mbcpeermade" if role != 'admin' else None
-        hashed_password = bcrypt.hashpw(default_password.encode('utf-8'), bcrypt.gensalt()).decode('utf-8') if default_password else None
+        # Basic email validation
+        if not re.match(r"[^@]+@[^@]+\.[^@]+", email):
+            return jsonify({'error': 'Invalid email format'}), 400
 
+        # Check for existing user
         existing_user = User.query.filter(
             (User.admission_number == admission_number) | (User.email == email)
         ).first()
@@ -56,6 +62,9 @@ def register_user():
                 return jsonify({"error": "Admission number already exists"}), 409
             if existing_user.email == email:
                 return jsonify({"error": "Email already exists"}), 409
+
+        # Hash the provided password
+        hashed_password = bcrypt.hashpw(password.encode('utf-8'), bcrypt.gensalt()).decode('utf-8')
 
         new_user = User(
             admission_number=admission_number,
@@ -88,22 +97,37 @@ def update_user(admission_number):
         role = data.get('role')
         batch = data.get('batch') if data.get('role') == 'student' else None
         departmentcode = data.get('departmentcode')
+        phone_number = data.get('phone_number')  # Added phone_number
 
+        # Validate required fields
         if not all([username, email, role, departmentcode]):
             return jsonify({'error': 'Missing required fields'}), 400
 
+        # Validate role
         if role not in ['admin', 'hod', 'staff', 'student']:
             return jsonify({'error': 'Invalid role value'}), 400
+
+        # Basic email validation
+        if not re.match(r"[^@]+@[^@]+\.[^@]+", email):
+            return jsonify({'error': 'Invalid email format'}), 400
 
         user = User.query.get(admission_number)
         if not user:
             return jsonify({'error': 'User not found'}), 404
+
+        # Check for email conflict with other users
+        existing_user = User.query.filter(
+            (User.email == email) & (User.admission_number != admission_number)
+        ).first()
+        if existing_user:
+            return jsonify({"error": "Email already exists"}), 409
 
         user.username = username
         user.email = email
         user.role = role
         user.batch = batch
         user.departmentcode = departmentcode
+        user.phone_number = phone_number  # Update phone_number
         db.session.commit()
 
         return jsonify({

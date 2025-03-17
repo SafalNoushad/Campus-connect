@@ -16,12 +16,17 @@ class _UsersPageState extends State<UsersPage> {
   List<Map<String, dynamic>> _users = [];
   List<Map<String, dynamic>> _departments = [];
   String? _errorMessage;
+  bool _isLoadingDepartments = true; // Added to track department loading state
 
   @override
   void initState() {
     super.initState();
     fetchUsers();
-    fetchDepartments();
+    fetchDepartments().then((_) {
+      setState(() {
+        _isLoadingDepartments = false; // Update loading state when done
+      });
+    });
   }
 
   // Fetch all users from the backend and filter out admins
@@ -59,6 +64,7 @@ class _UsersPageState extends State<UsersPage> {
   }
 
   // Fetch departments for the dropdown
+  // Fetch departments for the dropdown
   Future<void> fetchDepartments() async {
     try {
       final prefs = await SharedPreferences.getInstance();
@@ -68,19 +74,30 @@ class _UsersPageState extends State<UsersPage> {
         return;
       }
 
+      final url = Uri.parse(
+          '${NetworkConfig.getBaseUrl()}/api/departments/departments');
+      print('Fetching departments from: $url'); // Log URL
+      print('Using token: $token'); // Log token
+
       final response = await http.get(
-        Uri.parse('${NetworkConfig.getBaseUrl()}/api/admin/departments'),
+        url,
         headers: {'Authorization': 'Bearer $token'},
       );
+
+      print(
+          'Departments Response: ${response.statusCode} - ${response.body}'); // Log response
 
       if (response.statusCode == 200) {
         setState(() {
           _departments =
               List<Map<String, dynamic>>.from(jsonDecode(response.body));
+          _errorMessage =
+              _departments.isEmpty ? 'No departments available' : null;
         });
       } else {
         setState(() {
-          _errorMessage = 'Failed to load departments: ${response.statusCode}';
+          _errorMessage =
+              'Failed to load departments: ${response.statusCode} - ${response.body}';
         });
       }
     } catch (e) {
@@ -164,6 +181,42 @@ class _UsersPageState extends State<UsersPage> {
     }
   }
 
+  // Add a new user
+  Future<void> addUser(Map<String, dynamic> userData) async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final token = prefs.getString('jwt_token');
+      if (token == null) {
+        _redirectToLogin();
+        return;
+      }
+
+      final response = await http.post(
+        Uri.parse('${NetworkConfig.getBaseUrl()}/api/admin/add_user'),
+        headers: {
+          'Authorization': 'Bearer $token',
+          'Content-Type': 'application/json',
+        },
+        body: jsonEncode(userData),
+      );
+
+      if (response.statusCode == 201) {
+        await fetchUsers();
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('User added successfully')),
+        );
+      } else {
+        setState(() {
+          _errorMessage = 'Failed to add user: ${response.statusCode}';
+        });
+      }
+    } catch (e) {
+      setState(() {
+        _errorMessage = 'Error adding user: $e';
+      });
+    }
+  }
+
   // Redirect to login if token is missing
   void _redirectToLogin() {
     Navigator.pushReplacementNamed(context, '/login');
@@ -193,13 +246,11 @@ class _UsersPageState extends State<UsersPage> {
             builder: (dialogContext, setDialogState) {
               return Container(
                 padding: const EdgeInsets.all(20),
-                width:
-                    MediaQuery.of(context).size.width * 0.9, // Responsive width
+                width: MediaQuery.of(context).size.width * 0.9,
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    // Header
                     Row(
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
@@ -217,7 +268,6 @@ class _UsersPageState extends State<UsersPage> {
                       ],
                     ),
                     const SizedBox(height: 16),
-                    // Form fields
                     TextField(
                       controller: usernameController,
                       decoration: InputDecoration(
@@ -297,9 +347,28 @@ class _UsersPageState extends State<UsersPage> {
                     ],
                     const SizedBox(height: 12),
                     _departments.isEmpty
-                        ? const Text(
-                            "Loading departments...",
-                            style: TextStyle(color: Colors.grey),
+                        ? Row(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              const Text(
+                                "Failed to load departments",
+                                style: TextStyle(color: Colors.red),
+                              ),
+                              const SizedBox(width: 8),
+                              TextButton(
+                                onPressed: () {
+                                  setDialogState(() {
+                                    _isLoadingDepartments = true;
+                                  });
+                                  fetchDepartments().then((_) {
+                                    setDialogState(() {
+                                      _isLoadingDepartments = false;
+                                    });
+                                  });
+                                },
+                                child: const Text("Retry"),
+                              ),
+                            ],
                           )
                         : DropdownButtonFormField<String>(
                             value: departmentcode,
@@ -325,7 +394,6 @@ class _UsersPageState extends State<UsersPage> {
                             ),
                           ),
                     const SizedBox(height: 20),
-                    // Action buttons
                     Row(
                       mainAxisAlignment: MainAxisAlignment.end,
                       children: [
@@ -388,6 +456,282 @@ class _UsersPageState extends State<UsersPage> {
     );
   }
 
+  // Show dialog to add a new user
+  void showAddUserDialog() async {
+    // Ensure departments are loaded before showing the dialog
+    if (_departments.isEmpty && _isLoadingDepartments) {
+      await fetchDepartments();
+      setState(() {
+        _isLoadingDepartments = false;
+      });
+    }
+
+    TextEditingController admissionNumberController = TextEditingController();
+    TextEditingController usernameController = TextEditingController();
+    TextEditingController emailController = TextEditingController();
+    TextEditingController phoneController = TextEditingController();
+    TextEditingController passwordController = TextEditingController();
+    TextEditingController batchController = TextEditingController();
+    String role = 'student'; // Default role
+    String? departmentcode;
+
+    showDialog(
+      context: context,
+      builder: (dialogContext) {
+        return Dialog(
+          shape:
+              RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+          elevation: 4,
+          child: StatefulBuilder(
+            builder: (dialogContext, setDialogState) {
+              return Container(
+                padding: const EdgeInsets.all(20),
+                width: MediaQuery.of(context).size.width * 0.9,
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        const Text(
+                          "Add New User",
+                          style: TextStyle(
+                            fontSize: 20,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                        IconButton(
+                          icon: const Icon(Icons.close, color: Colors.grey),
+                          onPressed: () => Navigator.pop(dialogContext),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 16),
+                    TextField(
+                      controller: admissionNumberController,
+                      decoration: InputDecoration(
+                        labelText: "Admission Number",
+                        prefixIcon: const Icon(Icons.badge),
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        filled: true,
+                        fillColor: Colors.grey[100],
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                    TextField(
+                      controller: usernameController,
+                      decoration: InputDecoration(
+                        labelText: "Username",
+                        prefixIcon: const Icon(Icons.person_outline),
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        filled: true,
+                        fillColor: Colors.grey[100],
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                    TextField(
+                      controller: emailController,
+                      decoration: InputDecoration(
+                        labelText: "Email",
+                        prefixIcon: const Icon(Icons.email_outlined),
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        filled: true,
+                        fillColor: Colors.grey[100],
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                    TextField(
+                      controller: phoneController,
+                      decoration: InputDecoration(
+                        labelText: "Phone Number (Optional)",
+                        prefixIcon: const Icon(Icons.phone_outlined),
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        filled: true,
+                        fillColor: Colors.grey[100],
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                    TextField(
+                      controller: passwordController,
+                      decoration: InputDecoration(
+                        labelText: "Password",
+                        prefixIcon: const Icon(Icons.lock),
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        filled: true,
+                        fillColor: Colors.grey[100],
+                      ),
+                      obscureText: true,
+                    ),
+                    const SizedBox(height: 12),
+                    DropdownButtonFormField<String>(
+                      value: role,
+                      items: ['hod', 'staff', 'student']
+                          .map((r) => DropdownMenuItem(
+                                value: r,
+                                child: Text(r.toUpperCase()),
+                              ))
+                          .toList(),
+                      onChanged: (value) {
+                        setDialogState(() {
+                          role = value!;
+                        });
+                      },
+                      decoration: InputDecoration(
+                        labelText: "Role",
+                        prefixIcon: Icon(_getRoleIcon(role)),
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        filled: true,
+                        fillColor: Colors.grey[100],
+                      ),
+                    ),
+                    if (role == 'student') ...[
+                      const SizedBox(height: 12),
+                      TextField(
+                        controller: batchController,
+                        decoration: InputDecoration(
+                          labelText: "Batch (e.g., 2021-2025)",
+                          prefixIcon: const Icon(Icons.calendar_today),
+                          border: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          filled: true,
+                          fillColor: Colors.grey[100],
+                        ),
+                      ),
+                    ],
+                    const SizedBox(height: 12),
+                    _isLoadingDepartments
+                        ? const Center(child: CircularProgressIndicator())
+                        : _departments.isEmpty
+                            ? Row(
+                                mainAxisAlignment: MainAxisAlignment.center,
+                                children: [
+                                  const Text(
+                                    "Failed to load departments",
+                                    style: TextStyle(color: Colors.red),
+                                  ),
+                                  const SizedBox(width: 8),
+                                  TextButton(
+                                    onPressed: () {
+                                      setDialogState(() {
+                                        _isLoadingDepartments = true;
+                                      });
+                                      fetchDepartments().then((_) {
+                                        setDialogState(() {
+                                          _isLoadingDepartments = false;
+                                        });
+                                      });
+                                    },
+                                    child: const Text("Retry"),
+                                  ),
+                                ],
+                              )
+                            : DropdownButtonFormField<String>(
+                                value: departmentcode,
+                                items: _departments.map((dept) {
+                                  return DropdownMenuItem<String>(
+                                    value: dept['departmentcode'],
+                                    child: Text(dept['departmentname']),
+                                  );
+                                }).toList(),
+                                onChanged: (value) {
+                                  setDialogState(() {
+                                    departmentcode = value;
+                                  });
+                                },
+                                decoration: InputDecoration(
+                                  labelText: "Department",
+                                  prefixIcon: const Icon(Icons.domain),
+                                  border: OutlineInputBorder(
+                                    borderRadius: BorderRadius.circular(12),
+                                  ),
+                                  filled: true,
+                                  fillColor: Colors.grey[100],
+                                ),
+                              ),
+                    const SizedBox(height: 20),
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.end,
+                      children: [
+                        TextButton(
+                          onPressed: () => Navigator.pop(dialogContext),
+                          style: TextButton.styleFrom(
+                            foregroundColor: Colors.grey,
+                            padding: const EdgeInsets.symmetric(
+                                horizontal: 16, vertical: 8),
+                          ),
+                          child: const Text("Cancel"),
+                        ),
+                        const SizedBox(width: 8),
+                        ElevatedButton(
+                          onPressed: _isLoadingDepartments
+                              ? null
+                              : () async {
+                                  if (admissionNumberController.text.isEmpty ||
+                                      usernameController.text.isEmpty ||
+                                      emailController.text.isEmpty ||
+                                      passwordController.text.isEmpty ||
+                                      departmentcode == null) {
+                                    ScaffoldMessenger.of(context).showSnackBar(
+                                      const SnackBar(
+                                          content: Text(
+                                              "Please fill all required fields")),
+                                    );
+                                    return;
+                                  }
+                                  await addUser({
+                                    'admission_number':
+                                        admissionNumberController.text,
+                                    'username': usernameController.text,
+                                    'email': emailController.text,
+                                    'phone_number': phoneController.text.isEmpty
+                                        ? null
+                                        : phoneController.text,
+                                    'password': passwordController.text,
+                                    'role': role,
+                                    'batch': role == 'student'
+                                        ? batchController.text
+                                        : null,
+                                    'departmentcode': departmentcode,
+                                  });
+                                  Navigator.pop(dialogContext);
+                                },
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: Theme.of(context).primaryColor,
+                            padding: const EdgeInsets.symmetric(
+                                horizontal: 16, vertical: 8),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                          ),
+                          child: const Text("Add",
+                              style: TextStyle(color: Colors.white)),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              );
+            },
+          ),
+        );
+      },
+    );
+  }
+
   // Helper method to get role-specific color
   Color _getRoleColor(String role) {
     switch (role) {
@@ -435,13 +779,7 @@ class _UsersPageState extends State<UsersPage> {
         actions: [
           IconButton(
             icon: const Icon(Icons.add),
-            onPressed: () {
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(
-                    content:
-                        Text("Add user functionality not implemented yet")),
-              );
-            },
+            onPressed: () => showAddUserDialog(),
           ),
         ],
       ),

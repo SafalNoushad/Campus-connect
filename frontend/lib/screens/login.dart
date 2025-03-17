@@ -32,35 +32,41 @@ class LoginScreenState extends State<LoginScreen> {
   Future<void> _checkUserRole() async {
     SharedPreferences prefs = await SharedPreferences.getInstance();
     String? token = prefs.getString('jwt_token');
-    String? role =
-        prefs.getString('user_role'); // Updated to 'user_role' to match backend
+    String? role = prefs.getString('user_role');
+
+    debugPrint(
+        'Starting _checkUserRole - All SharedPreferences keys: ${prefs.getKeys()}');
+    debugPrint('JWT Token: $token');
+    debugPrint('User Role from SharedPreferences: $role');
 
     if (token != null) {
       if (role == 'admin') {
+        debugPrint('Redirecting to AdminDashboard');
         Navigator.pushReplacement(
           context,
           MaterialPageRoute(builder: (context) => const AdminDashboard()),
         );
       } else if (role == 'staff') {
+        debugPrint('Redirecting to StaffDashboard');
         Navigator.pushReplacement(
           context,
           MaterialPageRoute(builder: (context) => const StaffDashboard()),
         );
       } else if (role == 'hod') {
+        debugPrint('Redirecting to HodDashboard');
         Navigator.pushReplacement(
           context,
           MaterialPageRoute(builder: (context) => const HodDashboard()),
         );
       } else if (role == 'student') {
+        debugPrint('Redirecting to HomeScreen');
         Navigator.pushReplacement(
           context,
           MaterialPageRoute(
             builder: (context) => HomeScreen(userData: {
-              'name': prefs.getString('username') ??
-                  "User", // Updated to 'username'
+              'name': prefs.getString('username') ?? "User",
               'email': prefs.getString('email') ?? "N/A",
-              'phone': prefs.getString('phone_number') ??
-                  "N/A", // Updated to 'phone_number'
+              'phone': prefs.getString('phone_number') ?? "N/A",
               'admission_number': prefs.getString('admission_number') ?? "",
             }),
           ),
@@ -95,46 +101,52 @@ class LoginScreenState extends State<LoginScreen> {
         }),
       );
 
-      print('Login Response: ${response.statusCode} - ${response.body}');
+      debugPrint('Login Response: ${response.statusCode} - ${response.body}');
 
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body);
         SharedPreferences prefs = await SharedPreferences.getInstance();
         await prefs.setString('jwt_token', data['token']);
-        await prefs.setString(
-            'user_role', data['user']['role']); // Updated to 'user_role'
-        await prefs.setString(
-            'username', data['user']['username']); // Updated to 'username'
+        await prefs.setString('user_role', data['user']['role']);
+        await prefs.setString('username', data['user']['username']);
         await prefs.setString('email', data['user']['email']);
-        await prefs.setString('phone_number',
-            data['user']['phone_number'] ?? 'N/A'); // Updated to 'phone_number'
+        await prefs.setString(
+            'phone_number', data['user']['phone_number'] ?? 'N/A');
         await prefs.setString(
             'admission_number', data['user']['admission_number']);
         await prefs.setString(
-            'departmentcode',
-            data['user']['departmentcode'] ??
-                ''); // Already present, kept for consistency
+            'departmentcode', data['user']['departmentcode'] ?? '');
+
+        debugPrint('Saved user_role: ${data['user']['role']}');
+        debugPrint(
+            'Post-save - All SharedPreferences keys: ${prefs.getKeys()}');
+        debugPrint(
+            'Post-save - Verified user_role: ${prefs.getString('user_role')}');
 
         switch (data['user']['role']) {
           case 'admin':
+            debugPrint('Redirecting to AdminDashboard');
             Navigator.pushReplacement(
               context,
               MaterialPageRoute(builder: (context) => const AdminDashboard()),
             );
             break;
           case 'staff':
+            debugPrint('Redirecting to StaffDashboard');
             Navigator.pushReplacement(
               context,
               MaterialPageRoute(builder: (context) => const StaffDashboard()),
             );
             break;
           case 'hod':
+            debugPrint('Redirecting to HodDashboard');
             Navigator.pushReplacement(
               context,
               MaterialPageRoute(builder: (context) => const HodDashboard()),
             );
             break;
           case 'student':
+            debugPrint('Redirecting to HomeScreen');
             Navigator.pushReplacement(
               context,
               MaterialPageRoute(
