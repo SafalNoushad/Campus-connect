@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'academics_page.dart';
 import 'announcements_page.dart';
 import 'profile_page.dart';
-import 'chatbot_page.dart';
+import 'chatbot.dart';
 
 class HomeScreen extends StatefulWidget {
   final Map<String, String> userData; // Accept full user data

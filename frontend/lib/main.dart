@@ -3,7 +3,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'screens/splash.dart';
 import 'screens/login.dart';
 import 'screens/home.dart';
-import 'screens/chatbot_page.dart';
+import 'screens/chatbot.dart';
 import 'screens/admin_dashboard.dart';
 
 void main() {

@@ -2,30 +2,29 @@ import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
-import '../screens/admin_dashboard.dart'; // Replace with your actual admin dashboard path
-import '../utils/network_config.dart'; // Replace with your actual network config path
+import '../utils/network_config.dart';
+import '/hod_screens/hod_dashboard.dart';
 
-class UsersPage extends StatefulWidget {
-  const UsersPage({super.key});
+class DepartmentStaffPage extends StatefulWidget {
+  const DepartmentStaffPage({super.key});
 
   @override
-  _UsersPageState createState() => _UsersPageState();
+  _DepartmentStaffPageState createState() => _DepartmentStaffPageState();
 }
 
-class _UsersPageState extends State<UsersPage> {
-  List<Map<String, dynamic>> _users = [];
+class _DepartmentStaffPageState extends State<DepartmentStaffPage> {
+  List<Map<String, dynamic>> _staff = [];
   List<Map<String, dynamic>> _departments = [];
   String? _errorMessage;
 
   @override
   void initState() {
     super.initState();
-    fetchUsers();
+    fetchStaff();
     fetchDepartments();
   }
 
-  // Fetch all users from the backend and filter out admins
-  Future<void> fetchUsers() async {
+  Future<void> fetchStaff() async {
     try {
       final prefs = await SharedPreferences.getInstance();
       final token = prefs.getString('jwt_token');
@@ -35,30 +34,27 @@ class _UsersPageState extends State<UsersPage> {
       }
 
       final response = await http.get(
-        Uri.parse('${NetworkConfig.getBaseUrl()}/api/admin/users'),
+        Uri.parse('${NetworkConfig.getBaseUrl()}/api/hod/department/staff'),
         headers: {'Authorization': 'Bearer $token'},
       );
 
       if (response.statusCode == 200) {
         setState(() {
-          _users = List<Map<String, dynamic>>.from(jsonDecode(response.body))
-              .where((user) => user['role'] != 'admin')
-              .toList();
+          _staff = List<Map<String, dynamic>>.from(jsonDecode(response.body));
           _errorMessage = null;
         });
       } else {
         setState(() {
-          _errorMessage = 'Failed to load users: ${response.statusCode}';
+          _errorMessage = 'Failed to load staff: ${response.statusCode}';
         });
       }
     } catch (e) {
       setState(() {
-        _errorMessage = 'Error fetching users: $e';
+        _errorMessage = 'Error fetching staff: $e';
       });
     }
   }
 
-  // Fetch departments for the dropdown
   Future<void> fetchDepartments() async {
     try {
       final prefs = await SharedPreferences.getInstance();
@@ -69,7 +65,7 @@ class _UsersPageState extends State<UsersPage> {
       }
 
       final response = await http.get(
-        Uri.parse('${NetworkConfig.getBaseUrl()}/api/admin/departments'),
+        Uri.parse('${NetworkConfig.getBaseUrl()}/api/departments/departments'),
         headers: {'Authorization': 'Bearer $token'},
       );
 
@@ -90,9 +86,8 @@ class _UsersPageState extends State<UsersPage> {
     }
   }
 
-  // Update a user's details
-  Future<void> updateUser(
-      String admissionNumber, Map<String, dynamic> userData) async {
+  Future<void> updateStaff(
+      String admissionNumber, Map<String, dynamic> staffData) async {
     try {
       final prefs = await SharedPreferences.getInstance();
       final token = prefs.getString('jwt_token');
@@ -108,28 +103,27 @@ class _UsersPageState extends State<UsersPage> {
           'Authorization': 'Bearer $token',
           'Content-Type': 'application/json',
         },
-        body: jsonEncode(userData),
+        body: jsonEncode(staffData),
       );
 
       if (response.statusCode == 200) {
-        await fetchUsers();
+        await fetchStaff();
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('User updated successfully')),
+          const SnackBar(content: Text('Staff updated successfully')),
         );
       } else {
         setState(() {
-          _errorMessage = 'Failed to update user: ${response.statusCode}';
+          _errorMessage = 'Failed to update staff: ${response.statusCode}';
         });
       }
     } catch (e) {
       setState(() {
-        _errorMessage = 'Error updating user: $e';
+        _errorMessage = 'Error updating staff: $e';
       });
     }
   }
 
-  // Delete a user
-  Future<void> deleteUser(String admissionNumber) async {
+  Future<void> deleteStaff(String admissionNumber) async {
     try {
       final prefs = await SharedPreferences.getInstance();
       final token = prefs.getString('jwt_token');
@@ -148,39 +142,35 @@ class _UsersPageState extends State<UsersPage> {
       );
 
       if (response.statusCode == 200) {
-        await fetchUsers();
+        await fetchStaff();
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('User deleted successfully')),
+          const SnackBar(content: Text('Staff deleted successfully')),
         );
       } else {
         setState(() {
-          _errorMessage = 'Failed to delete user: ${response.statusCode}';
+          _errorMessage = 'Failed to delete staff: ${response.statusCode}';
         });
       }
     } catch (e) {
       setState(() {
-        _errorMessage = 'Error deleting user: $e';
+        _errorMessage = 'Error deleting staff: $e';
       });
     }
   }
 
-  // Redirect to login if token is missing
   void _redirectToLogin() {
     Navigator.pushReplacementNamed(context, '/login');
   }
 
-  // Show dialog to edit user details with enhanced UI
-  void showEditDialog(Map<String, dynamic> user) {
+  void showEditDialog(Map<String, dynamic> staff) {
     TextEditingController usernameController =
-        TextEditingController(text: user['username']);
+        TextEditingController(text: staff['username']);
     TextEditingController emailController =
-        TextEditingController(text: user['email']);
+        TextEditingController(text: staff['email']);
     TextEditingController phoneController =
-        TextEditingController(text: user['phone_number'] ?? '');
-    TextEditingController batchController =
-        TextEditingController(text: user['batch'] ?? '');
-    String role = user['role'];
-    String? departmentcode = user['departmentcode'];
+        TextEditingController(text: staff['phone_number'] ?? '');
+    String role = 'staff'; // Fixed to staff since this page is for staff only
+    String? departmentcode = staff['departmentcode'];
 
     showDialog(
       context: context,
@@ -193,23 +183,17 @@ class _UsersPageState extends State<UsersPage> {
             builder: (dialogContext, setDialogState) {
               return Container(
                 padding: const EdgeInsets.all(20),
-                width:
-                    MediaQuery.of(context).size.width * 0.9, // Responsive width
+                width: MediaQuery.of(context).size.width * 0.9,
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    // Header
                     Row(
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
-                        const Text(
-                          "Edit User",
-                          style: TextStyle(
-                            fontSize: 20,
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
+                        const Text("Edit Staff",
+                            style: TextStyle(
+                                fontSize: 20, fontWeight: FontWeight.bold)),
                         IconButton(
                           icon: const Icon(Icons.close, color: Colors.grey),
                           onPressed: () => Navigator.pop(dialogContext),
@@ -217,15 +201,13 @@ class _UsersPageState extends State<UsersPage> {
                       ],
                     ),
                     const SizedBox(height: 16),
-                    // Form fields
                     TextField(
                       controller: usernameController,
                       decoration: InputDecoration(
                         labelText: "Username",
                         prefixIcon: const Icon(Icons.person_outline),
                         border: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(12),
-                        ),
+                            borderRadius: BorderRadius.circular(12)),
                         filled: true,
                         fillColor: Colors.grey[100],
                       ),
@@ -237,8 +219,7 @@ class _UsersPageState extends State<UsersPage> {
                         labelText: "Email",
                         prefixIcon: const Icon(Icons.email_outlined),
                         border: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(12),
-                        ),
+                            borderRadius: BorderRadius.circular(12)),
                         filled: true,
                         fillColor: Colors.grey[100],
                       ),
@@ -250,57 +231,15 @@ class _UsersPageState extends State<UsersPage> {
                         labelText: "Phone Number (Optional)",
                         prefixIcon: const Icon(Icons.phone_outlined),
                         border: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(12),
-                        ),
+                            borderRadius: BorderRadius.circular(12)),
                         filled: true,
                         fillColor: Colors.grey[100],
                       ),
                     ),
-                    const SizedBox(height: 12),
-                    DropdownButtonFormField<String>(
-                      value: role,
-                      items: ['hod', 'staff', 'student']
-                          .map((r) => DropdownMenuItem(
-                                value: r,
-                                child: Text(r.toUpperCase()),
-                              ))
-                          .toList(),
-                      onChanged: (value) {
-                        setDialogState(() {
-                          role = value!;
-                        });
-                      },
-                      decoration: InputDecoration(
-                        labelText: "Role",
-                        prefixIcon: Icon(_getRoleIcon(role)),
-                        border: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(12),
-                        ),
-                        filled: true,
-                        fillColor: Colors.grey[100],
-                      ),
-                    ),
-                    if (role == 'student') ...[
-                      const SizedBox(height: 12),
-                      TextField(
-                        controller: batchController,
-                        decoration: InputDecoration(
-                          labelText: "Batch (e.g., 2021-2025)",
-                          prefixIcon: const Icon(Icons.calendar_today),
-                          border: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(12),
-                          ),
-                          filled: true,
-                          fillColor: Colors.grey[100],
-                        ),
-                      ),
-                    ],
                     const SizedBox(height: 12),
                     _departments.isEmpty
-                        ? const Text(
-                            "Loading departments...",
-                            style: TextStyle(color: Colors.grey),
-                          )
+                        ? const Text("Loading departments...",
+                            style: TextStyle(color: Colors.grey))
                         : DropdownButtonFormField<String>(
                             value: departmentcode,
                             items: _departments.map((dept) {
@@ -318,14 +257,12 @@ class _UsersPageState extends State<UsersPage> {
                               labelText: "Department",
                               prefixIcon: const Icon(Icons.domain),
                               border: OutlineInputBorder(
-                                borderRadius: BorderRadius.circular(12),
-                              ),
+                                  borderRadius: BorderRadius.circular(12)),
                               filled: true,
                               fillColor: Colors.grey[100],
                             ),
                           ),
                     const SizedBox(height: 20),
-                    // Action buttons
                     Row(
                       mainAxisAlignment: MainAxisAlignment.end,
                       children: [
@@ -351,16 +288,14 @@ class _UsersPageState extends State<UsersPage> {
                               );
                               return;
                             }
-                            await updateUser(user['admission_number'], {
+                            await updateStaff(staff['admission_number'], {
                               'username': usernameController.text,
                               'email': emailController.text,
                               'phone_number': phoneController.text.isEmpty
                                   ? null
                                   : phoneController.text,
                               'role': role,
-                              'batch': role == 'student'
-                                  ? batchController.text
-                                  : null,
+                              'batch': null, // No batch for staff
                               'departmentcode': departmentcode,
                             });
                             Navigator.pop(dialogContext);
@@ -370,8 +305,7 @@ class _UsersPageState extends State<UsersPage> {
                             padding: const EdgeInsets.symmetric(
                                 horizontal: 16, vertical: 8),
                             shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(12),
-                            ),
+                                borderRadius: BorderRadius.circular(12)),
                           ),
                           child: const Text("Save",
                               style: TextStyle(color: Colors.white)),
@@ -388,47 +322,27 @@ class _UsersPageState extends State<UsersPage> {
     );
   }
 
-  // Helper method to get role-specific color
   Color _getRoleColor(String role) {
-    switch (role) {
-      case 'hod':
-        return Colors.blueAccent;
-      case 'staff':
-        return Colors.green;
-      case 'student':
-        return Colors.orange;
-      default:
-        return Colors.grey;
-    }
+    return Colors.green; // Fixed to green for staff
   }
 
-  // Helper method to get role-specific icon
   IconData _getRoleIcon(String role) {
-    switch (role) {
-      case 'hod':
-        return Icons.supervisor_account;
-      case 'staff':
-        return Icons.person;
-      case 'student':
-        return Icons.school;
-      default:
-        return Icons.person_outline;
-    }
+    return Icons.person; // Fixed to person icon for staff
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text("Users"),
-        backgroundColor: Theme.of(context).primaryColor,
+        title: const Text("Manage Department Staff"),
+        backgroundColor: Colors.blueAccent,
         elevation: 4,
         leading: IconButton(
           icon: const Icon(Icons.arrow_back),
           onPressed: () {
             Navigator.pushReplacement(
               context,
-              MaterialPageRoute(builder: (context) => const AdminDashboard()),
+              MaterialPageRoute(builder: (context) => const HodDashboard()),
             );
           },
         ),
@@ -439,7 +353,7 @@ class _UsersPageState extends State<UsersPage> {
               ScaffoldMessenger.of(context).showSnackBar(
                 const SnackBar(
                     content:
-                        Text("Add user functionality not implemented yet")),
+                        Text("Add staff functionality not implemented yet")),
               );
             },
           ),
@@ -449,30 +363,27 @@ class _UsersPageState extends State<UsersPage> {
           ? Center(
               child: Text(_errorMessage!,
                   style: const TextStyle(color: Colors.red)))
-          : _users.isEmpty
-              ? const Center(child: CircularProgressIndicator())
+          : _staff.isEmpty
+              ? const Center(child: Text("No staff found in this department"))
               : Padding(
                   padding: const EdgeInsets.all(8.0),
                   child: ListView.builder(
-                    itemCount: _users.length,
+                    itemCount: _staff.length,
                     itemBuilder: (context, index) {
-                      final user = _users[index];
+                      final staff = _staff[index];
                       return Card(
                         elevation: 2,
                         margin: const EdgeInsets.symmetric(vertical: 6.0),
                         shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(12),
-                        ),
+                            borderRadius: BorderRadius.circular(12)),
                         child: Padding(
                           padding: const EdgeInsets.all(12.0),
                           child: Row(
                             children: [
                               CircleAvatar(
-                                backgroundColor: _getRoleColor(user['role']),
-                                child: Icon(
-                                  _getRoleIcon(user['role']),
-                                  color: Colors.white,
-                                ),
+                                backgroundColor: _getRoleColor(staff['role']),
+                                child: Icon(_getRoleIcon(staff['role']),
+                                    color: Colors.white),
                               ),
                               const SizedBox(width: 12),
                               Expanded(
@@ -480,36 +391,26 @@ class _UsersPageState extends State<UsersPage> {
                                   crossAxisAlignment: CrossAxisAlignment.start,
                                   children: [
                                     Text(
-                                      user['username'] ?? 'Unknown',
+                                      staff['username'] ?? 'Unknown',
                                       style: const TextStyle(
-                                        fontSize: 18,
-                                        fontWeight: FontWeight.bold,
-                                      ),
+                                          fontSize: 18,
+                                          fontWeight: FontWeight.bold),
                                     ),
                                     const SizedBox(height: 4),
                                     Text(
-                                      "Email: ${user['email'] ?? 'N/A'}",
+                                      "Email: ${staff['email'] ?? 'N/A'}",
                                       style: TextStyle(
-                                        fontSize: 14,
-                                        color: Colors.grey[700],
-                                      ),
+                                          fontSize: 14,
+                                          color: Colors.grey[700]),
                                     ),
                                     Text(
-                                      "Role: ${user['role'].toUpperCase()}",
+                                      "Role: STAFF",
                                       style: TextStyle(
                                         fontSize: 14,
-                                        color: _getRoleColor(user['role']),
+                                        color: _getRoleColor(staff['role']),
                                         fontWeight: FontWeight.w500,
                                       ),
                                     ),
-                                    if (user['batch'] != null)
-                                      Text(
-                                        "Batch: ${user['batch']}",
-                                        style: TextStyle(
-                                          fontSize: 14,
-                                          color: Colors.grey[700],
-                                        ),
-                                      ),
                                   ],
                                 ),
                               ),
@@ -519,15 +420,15 @@ class _UsersPageState extends State<UsersPage> {
                                   IconButton(
                                     icon: const Icon(Icons.edit,
                                         color: Colors.blue),
-                                    onPressed: () => showEditDialog(user),
-                                    tooltip: 'Edit User',
+                                    onPressed: () => showEditDialog(staff),
+                                    tooltip: 'Edit Staff',
                                   ),
                                   IconButton(
                                     icon: const Icon(Icons.delete,
                                         color: Colors.red),
                                     onPressed: () =>
-                                        deleteUser(user['admission_number']),
-                                    tooltip: 'Delete User',
+                                        deleteStaff(staff['admission_number']),
+                                    tooltip: 'Delete Staff',
                                   ),
                                 ],
                               ),

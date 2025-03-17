@@ -2,17 +2,23 @@ import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
-import '../screens/admin_dashboard.dart'; // Replace with your actual admin dashboard path
-import '../utils/network_config.dart'; // Replace with your actual network config path
+import '../utils/network_config.dart';
+import '../staff_screens/staff_dashboard.dart';
+import '../hod_screens/hod_dashboard.dart';
 
-class UsersPage extends StatefulWidget {
-  const UsersPage({super.key});
+class DepartmentUsersPage extends StatefulWidget {
+  final bool isStaffView; // Controls edit/delete visibility
+
+  const DepartmentUsersPage({
+    super.key,
+    required this.isStaffView,
+  });
 
   @override
-  _UsersPageState createState() => _UsersPageState();
+  _DepartmentUsersPageState createState() => _DepartmentUsersPageState();
 }
 
-class _UsersPageState extends State<UsersPage> {
+class _DepartmentUsersPageState extends State<DepartmentUsersPage> {
   List<Map<String, dynamic>> _users = [];
   List<Map<String, dynamic>> _departments = [];
   String? _errorMessage;
@@ -21,10 +27,10 @@ class _UsersPageState extends State<UsersPage> {
   void initState() {
     super.initState();
     fetchUsers();
-    fetchDepartments();
+    if (!widget.isStaffView)
+      fetchDepartments(); // Only fetch departments for HOD
   }
 
-  // Fetch all users from the backend and filter out admins
   Future<void> fetchUsers() async {
     try {
       final prefs = await SharedPreferences.getInstance();
@@ -34,31 +40,32 @@ class _UsersPageState extends State<UsersPage> {
         return;
       }
 
+      final String endpoint = widget.isStaffView
+          ? '/api/staff/department/users'
+          : '/api/hod/department/users';
+
       final response = await http.get(
-        Uri.parse('${NetworkConfig.getBaseUrl()}/api/admin/users'),
+        Uri.parse('${NetworkConfig.getBaseUrl()}$endpoint'),
         headers: {'Authorization': 'Bearer $token'},
       );
 
       if (response.statusCode == 200) {
         setState(() {
-          _users = List<Map<String, dynamic>>.from(jsonDecode(response.body))
-              .where((user) => user['role'] != 'admin')
-              .toList();
+          _users = List<Map<String, dynamic>>.from(jsonDecode(response.body));
           _errorMessage = null;
         });
       } else {
         setState(() {
-          _errorMessage = 'Failed to load users: ${response.statusCode}';
+          _errorMessage = 'Failed to load students: ${response.statusCode}';
         });
       }
     } catch (e) {
       setState(() {
-        _errorMessage = 'Error fetching users: $e';
+        _errorMessage = 'Error fetching students: $e';
       });
     }
   }
 
-  // Fetch departments for the dropdown
   Future<void> fetchDepartments() async {
     try {
       final prefs = await SharedPreferences.getInstance();
@@ -69,7 +76,7 @@ class _UsersPageState extends State<UsersPage> {
       }
 
       final response = await http.get(
-        Uri.parse('${NetworkConfig.getBaseUrl()}/api/admin/departments'),
+        Uri.parse('${NetworkConfig.getBaseUrl()}/api/departments/departments'),
         headers: {'Authorization': 'Bearer $token'},
       );
 
@@ -90,7 +97,6 @@ class _UsersPageState extends State<UsersPage> {
     }
   }
 
-  // Update a user's details
   Future<void> updateUser(
       String admissionNumber, Map<String, dynamic> userData) async {
     try {
@@ -114,21 +120,20 @@ class _UsersPageState extends State<UsersPage> {
       if (response.statusCode == 200) {
         await fetchUsers();
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('User updated successfully')),
+          const SnackBar(content: Text('Student updated successfully')),
         );
       } else {
         setState(() {
-          _errorMessage = 'Failed to update user: ${response.statusCode}';
+          _errorMessage = 'Failed to update student: ${response.statusCode}';
         });
       }
     } catch (e) {
       setState(() {
-        _errorMessage = 'Error updating user: $e';
+        _errorMessage = 'Error updating student: $e';
       });
     }
   }
 
-  // Delete a user
   Future<void> deleteUser(String admissionNumber) async {
     try {
       final prefs = await SharedPreferences.getInstance();
@@ -150,26 +155,24 @@ class _UsersPageState extends State<UsersPage> {
       if (response.statusCode == 200) {
         await fetchUsers();
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('User deleted successfully')),
+          const SnackBar(content: Text('Student deleted successfully')),
         );
       } else {
         setState(() {
-          _errorMessage = 'Failed to delete user: ${response.statusCode}';
+          _errorMessage = 'Failed to delete student: ${response.statusCode}';
         });
       }
     } catch (e) {
       setState(() {
-        _errorMessage = 'Error deleting user: $e';
+        _errorMessage = 'Error deleting student: $e';
       });
     }
   }
 
-  // Redirect to login if token is missing
   void _redirectToLogin() {
     Navigator.pushReplacementNamed(context, '/login');
   }
 
-  // Show dialog to edit user details with enhanced UI
   void showEditDialog(Map<String, dynamic> user) {
     TextEditingController usernameController =
         TextEditingController(text: user['username']);
@@ -179,7 +182,8 @@ class _UsersPageState extends State<UsersPage> {
         TextEditingController(text: user['phone_number'] ?? '');
     TextEditingController batchController =
         TextEditingController(text: user['batch'] ?? '');
-    String role = user['role'];
+    String role =
+        'student'; // Fixed to student since this page is for students only
     String? departmentcode = user['departmentcode'];
 
     showDialog(
@@ -193,23 +197,17 @@ class _UsersPageState extends State<UsersPage> {
             builder: (dialogContext, setDialogState) {
               return Container(
                 padding: const EdgeInsets.all(20),
-                width:
-                    MediaQuery.of(context).size.width * 0.9, // Responsive width
+                width: MediaQuery.of(context).size.width * 0.9,
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    // Header
                     Row(
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
-                        const Text(
-                          "Edit User",
-                          style: TextStyle(
-                            fontSize: 20,
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
+                        const Text("Edit Student",
+                            style: TextStyle(
+                                fontSize: 20, fontWeight: FontWeight.bold)),
                         IconButton(
                           icon: const Icon(Icons.close, color: Colors.grey),
                           onPressed: () => Navigator.pop(dialogContext),
@@ -217,15 +215,13 @@ class _UsersPageState extends State<UsersPage> {
                       ],
                     ),
                     const SizedBox(height: 16),
-                    // Form fields
                     TextField(
                       controller: usernameController,
                       decoration: InputDecoration(
                         labelText: "Username",
                         prefixIcon: const Icon(Icons.person_outline),
                         border: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(12),
-                        ),
+                            borderRadius: BorderRadius.circular(12)),
                         filled: true,
                         fillColor: Colors.grey[100],
                       ),
@@ -237,8 +233,7 @@ class _UsersPageState extends State<UsersPage> {
                         labelText: "Email",
                         prefixIcon: const Icon(Icons.email_outlined),
                         border: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(12),
-                        ),
+                            borderRadius: BorderRadius.circular(12)),
                         filled: true,
                         fillColor: Colors.grey[100],
                       ),
@@ -250,57 +245,27 @@ class _UsersPageState extends State<UsersPage> {
                         labelText: "Phone Number (Optional)",
                         prefixIcon: const Icon(Icons.phone_outlined),
                         border: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(12),
-                        ),
+                            borderRadius: BorderRadius.circular(12)),
                         filled: true,
                         fillColor: Colors.grey[100],
                       ),
                     ),
                     const SizedBox(height: 12),
-                    DropdownButtonFormField<String>(
-                      value: role,
-                      items: ['hod', 'staff', 'student']
-                          .map((r) => DropdownMenuItem(
-                                value: r,
-                                child: Text(r.toUpperCase()),
-                              ))
-                          .toList(),
-                      onChanged: (value) {
-                        setDialogState(() {
-                          role = value!;
-                        });
-                      },
+                    TextField(
+                      controller: batchController,
                       decoration: InputDecoration(
-                        labelText: "Role",
-                        prefixIcon: Icon(_getRoleIcon(role)),
+                        labelText: "Batch (e.g., 2021-2025)",
+                        prefixIcon: const Icon(Icons.calendar_today),
                         border: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(12),
-                        ),
+                            borderRadius: BorderRadius.circular(12)),
                         filled: true,
                         fillColor: Colors.grey[100],
                       ),
                     ),
-                    if (role == 'student') ...[
-                      const SizedBox(height: 12),
-                      TextField(
-                        controller: batchController,
-                        decoration: InputDecoration(
-                          labelText: "Batch (e.g., 2021-2025)",
-                          prefixIcon: const Icon(Icons.calendar_today),
-                          border: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(12),
-                          ),
-                          filled: true,
-                          fillColor: Colors.grey[100],
-                        ),
-                      ),
-                    ],
                     const SizedBox(height: 12),
                     _departments.isEmpty
-                        ? const Text(
-                            "Loading departments...",
-                            style: TextStyle(color: Colors.grey),
-                          )
+                        ? const Text("Loading departments...",
+                            style: TextStyle(color: Colors.grey))
                         : DropdownButtonFormField<String>(
                             value: departmentcode,
                             items: _departments.map((dept) {
@@ -318,14 +283,12 @@ class _UsersPageState extends State<UsersPage> {
                               labelText: "Department",
                               prefixIcon: const Icon(Icons.domain),
                               border: OutlineInputBorder(
-                                borderRadius: BorderRadius.circular(12),
-                              ),
+                                  borderRadius: BorderRadius.circular(12)),
                               filled: true,
                               fillColor: Colors.grey[100],
                             ),
                           ),
                     const SizedBox(height: 20),
-                    // Action buttons
                     Row(
                       mainAxisAlignment: MainAxisAlignment.end,
                       children: [
@@ -358,9 +321,7 @@ class _UsersPageState extends State<UsersPage> {
                                   ? null
                                   : phoneController.text,
                               'role': role,
-                              'batch': role == 'student'
-                                  ? batchController.text
-                                  : null,
+                              'batch': batchController.text,
                               'departmentcode': departmentcode,
                             });
                             Navigator.pop(dialogContext);
@@ -370,8 +331,7 @@ class _UsersPageState extends State<UsersPage> {
                             padding: const EdgeInsets.symmetric(
                                 horizontal: 16, vertical: 8),
                             shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(12),
-                            ),
+                                borderRadius: BorderRadius.circular(12)),
                           ),
                           child: const Text("Save",
                               style: TextStyle(color: Colors.white)),
@@ -388,69 +348,58 @@ class _UsersPageState extends State<UsersPage> {
     );
   }
 
-  // Helper method to get role-specific color
   Color _getRoleColor(String role) {
-    switch (role) {
-      case 'hod':
-        return Colors.blueAccent;
-      case 'staff':
-        return Colors.green;
-      case 'student':
-        return Colors.orange;
-      default:
-        return Colors.grey;
-    }
+    return Colors.orange; // Fixed to orange for students
   }
 
-  // Helper method to get role-specific icon
   IconData _getRoleIcon(String role) {
-    switch (role) {
-      case 'hod':
-        return Icons.supervisor_account;
-      case 'staff':
-        return Icons.person;
-      case 'student':
-        return Icons.school;
-      default:
-        return Icons.person_outline;
-    }
+    return Icons.school; // Fixed to school icon for students
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text("Users"),
-        backgroundColor: Theme.of(context).primaryColor,
+        title: Text(widget.isStaffView
+            ? "Department Students"
+            : "Manage Department Students"),
+        backgroundColor: widget.isStaffView ? Colors.green : Colors.blueAccent,
         elevation: 4,
         leading: IconButton(
           icon: const Icon(Icons.arrow_back),
           onPressed: () {
             Navigator.pushReplacement(
               context,
-              MaterialPageRoute(builder: (context) => const AdminDashboard()),
+              MaterialPageRoute(
+                builder: (context) => widget.isStaffView
+                    ? const StaffDashboard()
+                    : const HodDashboard(),
+              ),
             );
           },
         ),
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.add),
-            onPressed: () {
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(
-                    content:
-                        Text("Add user functionality not implemented yet")),
-              );
-            },
-          ),
-        ],
+        actions: widget.isStaffView
+            ? null
+            : [
+                IconButton(
+                  icon: const Icon(Icons.add),
+                  onPressed: () {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(
+                          content: Text(
+                              "Add student functionality not implemented yet")),
+                    );
+                  },
+                ),
+              ],
       ),
       body: _errorMessage != null
           ? Center(
               child: Text(_errorMessage!,
                   style: const TextStyle(color: Colors.red)))
           : _users.isEmpty
-              ? const Center(child: CircularProgressIndicator())
+              ? const Center(
+                  child: Text("No students found in this department"))
               : Padding(
                   padding: const EdgeInsets.all(8.0),
                   child: ListView.builder(
@@ -461,18 +410,15 @@ class _UsersPageState extends State<UsersPage> {
                         elevation: 2,
                         margin: const EdgeInsets.symmetric(vertical: 6.0),
                         shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(12),
-                        ),
+                            borderRadius: BorderRadius.circular(12)),
                         child: Padding(
                           padding: const EdgeInsets.all(12.0),
                           child: Row(
                             children: [
                               CircleAvatar(
                                 backgroundColor: _getRoleColor(user['role']),
-                                child: Icon(
-                                  _getRoleIcon(user['role']),
-                                  color: Colors.white,
-                                ),
+                                child: Icon(_getRoleIcon(user['role']),
+                                    color: Colors.white),
                               ),
                               const SizedBox(width: 12),
                               Expanded(
@@ -482,20 +428,18 @@ class _UsersPageState extends State<UsersPage> {
                                     Text(
                                       user['username'] ?? 'Unknown',
                                       style: const TextStyle(
-                                        fontSize: 18,
-                                        fontWeight: FontWeight.bold,
-                                      ),
+                                          fontSize: 18,
+                                          fontWeight: FontWeight.bold),
                                     ),
                                     const SizedBox(height: 4),
                                     Text(
                                       "Email: ${user['email'] ?? 'N/A'}",
                                       style: TextStyle(
-                                        fontSize: 14,
-                                        color: Colors.grey[700],
-                                      ),
+                                          fontSize: 14,
+                                          color: Colors.grey[700]),
                                     ),
                                     Text(
-                                      "Role: ${user['role'].toUpperCase()}",
+                                      "Role: STUDENT",
                                       style: TextStyle(
                                         fontSize: 14,
                                         color: _getRoleColor(user['role']),
@@ -506,31 +450,32 @@ class _UsersPageState extends State<UsersPage> {
                                       Text(
                                         "Batch: ${user['batch']}",
                                         style: TextStyle(
-                                          fontSize: 14,
-                                          color: Colors.grey[700],
-                                        ),
+                                            fontSize: 14,
+                                            color: Colors.grey[700]),
                                       ),
                                   ],
                                 ),
                               ),
-                              Row(
-                                mainAxisSize: MainAxisSize.min,
-                                children: [
-                                  IconButton(
-                                    icon: const Icon(Icons.edit,
-                                        color: Colors.blue),
-                                    onPressed: () => showEditDialog(user),
-                                    tooltip: 'Edit User',
-                                  ),
-                                  IconButton(
-                                    icon: const Icon(Icons.delete,
-                                        color: Colors.red),
-                                    onPressed: () =>
-                                        deleteUser(user['admission_number']),
-                                    tooltip: 'Delete User',
-                                  ),
-                                ],
-                              ),
+                              widget.isStaffView
+                                  ? const SizedBox.shrink()
+                                  : Row(
+                                      mainAxisSize: MainAxisSize.min,
+                                      children: [
+                                        IconButton(
+                                          icon: const Icon(Icons.edit,
+                                              color: Colors.blue),
+                                          onPressed: () => showEditDialog(user),
+                                          tooltip: 'Edit Student',
+                                        ),
+                                        IconButton(
+                                          icon: const Icon(Icons.delete,
+                                              color: Colors.red),
+                                          onPressed: () => deleteUser(
+                                              user['admission_number']),
+                                          tooltip: 'Delete Student',
+                                        ),
+                                      ],
+                                    ),
                             ],
                           ),
                         ),

@@ -1343,7 +1343,6 @@ import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
 import 'package:shared_preferences/shared_preferences.dart';
-import '../utils/network_config.dart';
 import 'package:file_picker/file_picker.dart';
 
 class ChatbotPage extends StatefulWidget {
@@ -1406,11 +1405,23 @@ class _ChatbotPageState extends State<ChatbotPage> {
     final userMessage = _messageController.text.trim();
     if (userMessage.isEmpty && file == null) return;
 
+    final prefs = await SharedPreferences.getInstance();
+    final token = prefs.getString('jwt_token');
+    if (token == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text("Please log in first")),
+      );
+      Navigator.pushReplacementNamed(context, '/login');
+      return;
+    }
+
     setState(() {
-      if (userMessage.isNotEmpty)
+      if (userMessage.isNotEmpty) {
         _messages.add({"sender": "user", "text": userMessage});
-      if (file != null)
+      }
+      if (file != null) {
         _messages.add({"sender": "user", "text": "Uploaded: ${file.name}"});
+      }
       _isLoading = true;
     });
     _messageController.clear();
@@ -1419,28 +1430,41 @@ class _ChatbotPageState extends State<ChatbotPage> {
     try {
       var request = http.MultipartRequest(
         'POST',
-        Uri.parse("${NetworkConfig.getBaseUrl()}/api/chat"),
+        Uri.parse("http://localhost:5001/api/chatbot/chat"),
       );
-      request.headers['Content-Type'] = 'multipart/form-data';
+      request.headers['Authorization'] = 'Bearer $token';
 
       if (userMessage.isNotEmpty) request.fields['message'] = userMessage;
       if (file != null) {
+        if (file.size > 10 * 1024 * 1024) {
+          // 10MB limit
+          throw Exception("File size exceeds 10MB limit");
+        }
         request.files
             .add(await http.MultipartFile.fromPath('file', file.path!));
       }
 
-      final response = await request.send();
+      final response =
+          await request.send().timeout(const Duration(seconds: 30));
       final responseBody = await http.Response.fromStream(response);
-
-      print("Response Status: ${response.statusCode}");
-      print("Response Body: ${responseBody.body}");
 
       if (response.statusCode == 200) {
         final responseData = jsonDecode(responseBody.body);
         setState(() {
-          final botResponse =
-              responseData["response"] ?? "No response from server";
-          _messages.add({"sender": "bot", "text": botResponse});
+          if (responseData.containsKey("summary")) {
+            _messages.add({
+              "sender": "bot",
+              "text": "Summary: ${responseData['summary']}"
+            });
+            _messages.add({
+              "sender": "bot",
+              "text": "Description: ${responseData['description']}"
+            });
+          } else {
+            final botResponse =
+                responseData["response"] ?? "No response from server";
+            _messages.add({"sender": "bot", "text": botResponse});
+          }
         });
       } else {
         final errorData = jsonDecode(responseBody.body);
@@ -1448,14 +1472,13 @@ class _ChatbotPageState extends State<ChatbotPage> {
           _messages.add({
             "sender": "bot",
             "text":
-                "Error: ${errorData['response'] ?? 'Status ${response.statusCode}'}"
+                "Error: ${errorData['error'] ?? 'Status ${response.statusCode}'}"
           });
         });
       }
     } catch (e) {
-      print("Error: $e");
       setState(() {
-        _messages.add({"sender": "bot", "text": "Error: $e"});
+        _messages.add({"sender": "bot", "text": "Error: ${e.toString()}"});
       });
     } finally {
       setState(() => _isLoading = false);
@@ -1499,7 +1522,7 @@ class _ChatbotPageState extends State<ChatbotPage> {
                   _chatTitle = _renameController.text;
                   if (_selectedChatIndex != -1) {
                     _chatSessions[_selectedChatIndex]["name"] = _chatTitle;
-                  } else {
+                  } else if (_messages.isNotEmpty) {
                     _chatSessions
                         .add({"name": _chatTitle, "messages": _messages});
                     _selectedChatIndex = _chatSessions.length - 1;
@@ -1517,15 +1540,13 @@ class _ChatbotPageState extends State<ChatbotPage> {
   }
 
   void _updateChatSessions() {
-    if (_selectedChatIndex == -1) {
-      if (_messages.isNotEmpty) {
-        _chatSessions.add({
-          "name": _chatTitle,
-          "messages": List<Map<String, String>>.from(_messages)
-        });
-        _selectedChatIndex = _chatSessions.length - 1;
-      }
-    } else {
+    if (_selectedChatIndex == -1 && _messages.isNotEmpty) {
+      _chatSessions.add({
+        "name": _chatTitle,
+        "messages": List<Map<String, String>>.from(_messages)
+      });
+      _selectedChatIndex = _chatSessions.length - 1;
+    } else if (_selectedChatIndex != -1) {
       _chatSessions[_selectedChatIndex]["messages"] =
           List<Map<String, String>>.from(_messages);
     }
@@ -1537,22 +1558,16 @@ class _ChatbotPageState extends State<ChatbotPage> {
       context: context,
       builder: (context) {
         return AlertDialog(
-          title: const Text("Upload File"),
-          content: const Text("Choose the type of file to upload:"),
+          title: const Text("Upload PDF"),
+          content:
+              const Text("Please upload a PDF file (max 10MB) to summarize."),
           actions: [
             TextButton(
               onPressed: () {
                 Navigator.pop(context);
-                _uploadFile('image');
+                _uploadFile();
               },
-              child: const Text("Image"),
-            ),
-            TextButton(
-              onPressed: () {
-                Navigator.pop(context);
-                _uploadFile('pdf');
-              },
-              child: const Text("PDF"),
+              child: const Text("Upload"),
             ),
             TextButton(
               onPressed: () => Navigator.pop(context),
@@ -1564,16 +1579,11 @@ class _ChatbotPageState extends State<ChatbotPage> {
     );
   }
 
-  Future<void> _uploadFile(String type) async {
-    FilePickerResult? result;
-    if (type == 'image') {
-      result = await FilePicker.platform.pickFiles(type: FileType.image);
-    } else if (type == 'pdf') {
-      result = await FilePicker.platform.pickFiles(
-        allowedExtensions: ['pdf'],
-        type: FileType.custom,
-      );
-    }
+  Future<void> _uploadFile() async {
+    FilePickerResult? result = await FilePicker.platform.pickFiles(
+      allowedExtensions: ['pdf'],
+      type: FileType.custom,
+    );
 
     if (result != null && result.files.isNotEmpty) {
       final file = result.files.single;

@@ -6,7 +6,7 @@ import '../../utils/network_config.dart';
 import '../screens/admin_dashboard.dart';
 
 class DepartmentsPage extends StatefulWidget {
-  const DepartmentsPage({super.key}); // Added const constructor
+  const DepartmentsPage({super.key});
 
   @override
   _DepartmentsPageState createState() => _DepartmentsPageState();
@@ -307,7 +307,8 @@ class _DepartmentsPageState extends State<DepartmentsPage> {
           onPressed: () {
             Navigator.pushReplacement(
               context,
-              MaterialPageRoute(builder: (context) => AdminDashboard()),
+              MaterialPageRoute(
+                  builder: (context) => AdminDashboard()), // Removed const
             );
           },
         ),

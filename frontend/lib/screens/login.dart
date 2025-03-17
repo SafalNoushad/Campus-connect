@@ -5,8 +5,12 @@ import 'dart:convert';
 import '../utils/network_config.dart';
 import 'home.dart';
 import 'admin_dashboard.dart';
+import '../staff_screens/staff_dashboard.dart';
+import '../hod_screens/hod_dashboard.dart';
 
 class LoginScreen extends StatefulWidget {
+  const LoginScreen({super.key});
+
   @override
   LoginScreenState createState() => LoginScreenState();
 }
@@ -30,24 +34,35 @@ class LoginScreenState extends State<LoginScreen> {
     String? token = prefs.getString('jwt_token');
     String? role = prefs.getString('role');
 
-    if (token != null && role == 'admin') {
-      Navigator.pushReplacement(
-        context,
-        MaterialPageRoute(builder: (context) => AdminDashboard()),
-      );
-    } else if (token != null &&
-        (role == 'student' || role == 'staff' || role == 'hod')) {
-      Navigator.pushReplacement(
-        context,
-        MaterialPageRoute(
-          builder: (context) => HomeScreen(userData: {
-            'name': prefs.getString('name') ?? "User",
-            'email': prefs.getString('email') ?? "N/A",
-            'phone': prefs.getString('phone') ?? "N/A",
-            'admission_number': prefs.getString('admission_number') ?? "",
-          }),
-        ),
-      );
+    if (token != null) {
+      if (role == 'admin') {
+        Navigator.pushReplacement(
+          context,
+          MaterialPageRoute(builder: (context) => const AdminDashboard()),
+        );
+      } else if (role == 'staff') {
+        Navigator.pushReplacement(
+          context,
+          MaterialPageRoute(builder: (context) => const StaffDashboard()),
+        );
+      } else if (role == 'hod') {
+        Navigator.pushReplacement(
+          context,
+          MaterialPageRoute(builder: (context) => const HodDashboard()),
+        );
+      } else if (role == 'student') {
+        Navigator.pushReplacement(
+          context,
+          MaterialPageRoute(
+            builder: (context) => HomeScreen(userData: {
+              'name': prefs.getString('name') ?? "User",
+              'email': prefs.getString('email') ?? "N/A",
+              'phone': prefs.getString('phone') ?? "N/A",
+              'admission_number': prefs.getString('admission_number') ?? "",
+            }),
+          ),
+        );
+      }
     }
 
     setState(() {
@@ -89,24 +104,43 @@ class LoginScreenState extends State<LoginScreen> {
         await prefs.setString('phone', data['user']['phone_number'] ?? 'N/A');
         await prefs.setString(
             'admission_number', data['user']['admission_number']);
+        await prefs.setString('departmentcode',
+            data['user']['departmentcode'] ?? ''); // Store departmentcode
 
-        if (data['user']['role'] == 'admin') {
-          Navigator.pushReplacement(
-            context,
-            MaterialPageRoute(builder: (context) => AdminDashboard()),
-          );
-        } else {
-          Navigator.pushReplacement(
-            context,
-            MaterialPageRoute(
-              builder: (context) => HomeScreen(userData: {
-                'name': data['user']['username'],
-                'email': data['user']['email'],
-                'phone': data['user']['phone_number'] ?? 'N/A',
-                'admission_number': data['user']['admission_number'],
-              }),
-            ),
-          );
+        switch (data['user']['role']) {
+          case 'admin':
+            Navigator.pushReplacement(
+              context,
+              MaterialPageRoute(builder: (context) => const AdminDashboard()),
+            );
+            break;
+          case 'staff':
+            Navigator.pushReplacement(
+              context,
+              MaterialPageRoute(builder: (context) => const StaffDashboard()),
+            );
+            break;
+          case 'hod':
+            Navigator.pushReplacement(
+              context,
+              MaterialPageRoute(builder: (context) => const HodDashboard()),
+            );
+            break;
+          case 'student':
+            Navigator.pushReplacement(
+              context,
+              MaterialPageRoute(
+                builder: (context) => HomeScreen(userData: {
+                  'name': data['user']['username'],
+                  'email': data['user']['email'],
+                  'phone': data['user']['phone_number'] ?? 'N/A',
+                  'admission_number': data['user']['admission_number'],
+                }),
+              ),
+            );
+            break;
+          default:
+            _showMessage('Unknown role: ${data['user']['role']}', Colors.red);
         }
       } else {
         final errorData = jsonDecode(response.body);
@@ -183,6 +217,9 @@ class LoginScreenState extends State<LoginScreen> {
                         onPressed: isLoading ? null : _login,
                         style: ElevatedButton.styleFrom(
                           backgroundColor: Theme.of(context).primaryColor,
+                          padding: const EdgeInsets.symmetric(vertical: 12),
+                          shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(12)),
                         ),
                         child: isLoading
                             ? const CircularProgressIndicator(

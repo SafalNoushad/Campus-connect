@@ -44,7 +44,11 @@ def login():
         if not bcrypt.checkpw(password.encode('utf-8'), user.password.encode('utf-8')):
             return jsonify({"error": "Invalid admission number or password"}), 401
 
-        access_token = create_access_token(identity=user.admission_number, additional_claims={"role": user.role})
+        # Include departmentcode in the token
+        access_token = create_access_token(
+            identity=user.admission_number,
+            additional_claims={"role": user.role, "departmentcode": user.departmentcode}
+        )
 
         return jsonify({
             "message": "Login successful",

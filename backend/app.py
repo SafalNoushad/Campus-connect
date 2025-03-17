@@ -7,6 +7,7 @@ from database import db
 from routes.auth import auth_bp
 from routes.admin import admin
 from routes.departments import departments_bp
+from routes.staff_hod import staff_hod_bp
 from routes.chatbot import chatbot_bp
 import logging
 
@@ -43,6 +44,7 @@ def create_app():
     app.register_blueprint(admin, url_prefix='/api/admin')
     app.register_blueprint(departments_bp, url_prefix='/api/departments')
     app.register_blueprint(chatbot_bp, url_prefix='/api/chatbot')
+    app.register_blueprint(staff_hod_bp, url_prefix='/api')
 
     # Login endpoint (placeholder, replace with real authentication)
     @app.route('/api/auth/login', methods=['POST'])
