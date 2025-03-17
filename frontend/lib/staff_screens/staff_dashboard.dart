@@ -10,16 +10,25 @@ class StaffDashboard extends StatefulWidget {
 }
 
 class _StaffDashboardState extends State<StaffDashboard> {
+  String? username; // Add variable to store username
+
   @override
   void initState() {
     super.initState();
+    _loadUsername(); // Load username on initialization
+  }
+
+  Future<void> _loadUsername() async {
+    final prefs = await SharedPreferences.getInstance();
+    setState(() {
+      username = prefs.getString('username') ??
+          'Staff'; // Default to 'Staff' if username not found
+    });
   }
 
   Future<void> _logout(BuildContext context) async {
     final prefs = await SharedPreferences.getInstance();
-    await prefs.remove('jwt_token');
-    await prefs.remove('user_role');
-    await prefs.remove('departmentcode');
+    await prefs.clear(); // Clear all preferences
     Navigator.pushReplacementNamed(context, '/login');
   }
 
@@ -29,7 +38,6 @@ class _StaffDashboardState extends State<StaffDashboard> {
       appBar: AppBar(
         title: const Text("Staff Dashboard"),
         backgroundColor: Colors.green,
-        elevation: 4,
         actions: [
           IconButton(
             icon: const Icon(Icons.logout),
@@ -43,12 +51,12 @@ class _StaffDashboardState extends State<StaffDashboard> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            const Text(
-              "Welcome, Staff!",
-              style: TextStyle(
-                  fontSize: 24,
-                  fontWeight: FontWeight.bold,
-                  color: Colors.green),
+            Text(
+              'Welcome, $username!', // Updated to display username
+              style: Theme.of(context)
+                  .textTheme
+                  .headlineSmall
+                  ?.copyWith(color: Colors.green),
               textAlign: TextAlign.center,
             ),
             const SizedBox(height: 20),
@@ -64,11 +72,6 @@ class _StaffDashboardState extends State<StaffDashboard> {
               },
               icon: const Icon(Icons.school),
               label: const Text("View Department Students"),
-              style: ElevatedButton.styleFrom(
-                padding: const EdgeInsets.symmetric(vertical: 12),
-                shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(12)),
-              ),
             ),
             const SizedBox(height: 16),
             ElevatedButton.icon(
@@ -79,11 +82,6 @@ class _StaffDashboardState extends State<StaffDashboard> {
               },
               icon: const Icon(Icons.description),
               label: const Text("View Reports"),
-              style: ElevatedButton.styleFrom(
-                padding: const EdgeInsets.symmetric(vertical: 12),
-                shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(12)),
-              ),
             ),
           ],
         ),

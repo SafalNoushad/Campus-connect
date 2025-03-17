@@ -5,6 +5,8 @@ import 'screens/login.dart';
 import 'screens/home.dart';
 import 'screens/chatbot.dart';
 import 'screens/admin_dashboard.dart';
+import 'staff_screens/staff_dashboard.dart'; // Add StaffDashboard import
+import 'hod_screens/hod_dashboard.dart'; // Add HodDashboard import
 
 void main() {
   runApp(const MyApp());
@@ -62,9 +64,7 @@ class MyAppState extends State<MyApp> {
           ? const SplashScreen()
           : jwtToken == null
               ? LoginScreen()
-              : userData['role'] == 'admin'
-                  ? AdminDashboard()
-                  : HomeScreen(userData: userData),
+              : _getHomeScreenBasedOnRole(), // Updated to handle all roles
       routes: {
         '/login': (context) => LoginScreen(),
         '/home': (context) => HomeScreen(
@@ -75,5 +75,21 @@ class MyAppState extends State<MyApp> {
         '/chatbot': (context) => ChatbotPage(),
       },
     );
+  }
+
+  // New method to determine the home screen based on role
+  Widget _getHomeScreenBasedOnRole() {
+    switch (userData['role']) {
+      case 'admin':
+        return AdminDashboard();
+      case 'staff':
+        return const StaffDashboard();
+      case 'hod':
+        return const HodDashboard();
+      case 'student': // Explicitly handle student role
+        return HomeScreen(userData: userData);
+      default:
+        return LoginScreen(); // Fallback to login for unknown roles
+    }
   }
 }

@@ -32,7 +32,8 @@ class LoginScreenState extends State<LoginScreen> {
   Future<void> _checkUserRole() async {
     SharedPreferences prefs = await SharedPreferences.getInstance();
     String? token = prefs.getString('jwt_token');
-    String? role = prefs.getString('role');
+    String? role =
+        prefs.getString('user_role'); // Updated to 'user_role' to match backend
 
     if (token != null) {
       if (role == 'admin') {
@@ -55,9 +56,11 @@ class LoginScreenState extends State<LoginScreen> {
           context,
           MaterialPageRoute(
             builder: (context) => HomeScreen(userData: {
-              'name': prefs.getString('name') ?? "User",
+              'name': prefs.getString('username') ??
+                  "User", // Updated to 'username'
               'email': prefs.getString('email') ?? "N/A",
-              'phone': prefs.getString('phone') ?? "N/A",
+              'phone': prefs.getString('phone_number') ??
+                  "N/A", // Updated to 'phone_number'
               'admission_number': prefs.getString('admission_number') ?? "",
             }),
           ),
@@ -98,14 +101,19 @@ class LoginScreenState extends State<LoginScreen> {
         final data = jsonDecode(response.body);
         SharedPreferences prefs = await SharedPreferences.getInstance();
         await prefs.setString('jwt_token', data['token']);
-        await prefs.setString('role', data['user']['role']);
-        await prefs.setString('name', data['user']['username']);
+        await prefs.setString(
+            'user_role', data['user']['role']); // Updated to 'user_role'
+        await prefs.setString(
+            'username', data['user']['username']); // Updated to 'username'
         await prefs.setString('email', data['user']['email']);
-        await prefs.setString('phone', data['user']['phone_number'] ?? 'N/A');
+        await prefs.setString('phone_number',
+            data['user']['phone_number'] ?? 'N/A'); // Updated to 'phone_number'
         await prefs.setString(
             'admission_number', data['user']['admission_number']);
-        await prefs.setString('departmentcode',
-            data['user']['departmentcode'] ?? ''); // Store departmentcode
+        await prefs.setString(
+            'departmentcode',
+            data['user']['departmentcode'] ??
+                ''); // Already present, kept for consistency
 
         switch (data['user']['role']) {
           case 'admin':
