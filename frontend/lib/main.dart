@@ -4,7 +4,7 @@ import 'screens/splash.dart';
 import 'screens/login.dart';
 import 'screens/home.dart';
 import 'screens/chatbot.dart';
-import 'screens/admin_dashboard.dart';
+import 'admin_screens/admin_dashboard.dart';
 import 'staff_screens/staff_dashboard.dart';
 import 'hod_screens/hod_dashboard.dart';
 import 'admin_screens/departments_page.dart';

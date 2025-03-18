@@ -3,7 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
 import '../utils/network_config.dart';
-import '/hod_screens/hod_dashboard.dart';
+import '../hod_screens/hod_dashboard.dart';
 
 class DepartmentStaffPage extends StatefulWidget {
   const DepartmentStaffPage({super.key});

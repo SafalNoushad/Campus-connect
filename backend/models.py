@@ -38,3 +38,22 @@ class Department(db.Model):
             "departmentcode": self.departmentcode,
             "departmentname": self.departmentname
         }
+
+class Subject(db.Model):
+    __tablename__ = 'subjects'
+    id = db.Column(db.Integer)
+    semester = db.Column(db.String(2), nullable=False)
+    subject_code = db.Column(db.String(10), primary_key=True ,unique=True, nullable=False)
+    subject_name = db.Column(db.String(100), nullable=False)
+    credits = db.Column(db.Integer, nullable=False)
+    departmentcode = db.Column(db.String(10), db.ForeignKey('departments.departmentcode'), nullable=False)
+
+    def to_dict(self):
+        return {
+            "id": self.id,
+            "semester": self.semester,
+            "subject_code": self.subject_code,
+            "subject_name": self.subject_name,
+            "credits": self.credits,
+            "departmentcode": self.departmentcode
+        }

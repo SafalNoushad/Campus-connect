@@ -2,23 +2,22 @@ frontend/lib/admin_screens/departments_page.dart:
 
 contents:
 import 'package:flutter/material.dart';
-import 'dart:convert';
-import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
-import '../../utils/network_config.dart';
-import '../screens/admin_dashboard.dart';
+import 'package:http/http.dart' as http;
+import 'dart:convert';
+import '../utils/network_config.dart';
 
-class DepartmentsPage extends StatefulWidget {
-  const DepartmentsPage({super.key});
+class DepartmentPage extends StatefulWidget {
+  const DepartmentPage({super.key});
 
   @override
-  DepartmentsPageState createState() => DepartmentsPageState();
+  State<DepartmentPage> createState() => _DepartmentPageState();
 }
 
-class DepartmentsPageState extends State<DepartmentsPage> {
-  List<dynamic> _departments = [];
-  String? _errorMessage;
+class _DepartmentPageState extends State<DepartmentPage> {
   bool _isLoading = false;
+  String? _errorMessage;
+  List<Map<String, dynamic>> _departments = [];
 
   @override
   void initState() {
@@ -31,56 +30,52 @@ class DepartmentsPageState extends State<DepartmentsPage> {
     try {
       final prefs = await SharedPreferences.getInstance();
       final token = prefs.getString('jwt_token');
-
       if (token == null) {
-        print('No JWT token found, redirecting to login');
         _redirectToLogin();
         return;
       }
 
-      final url = Uri.parse(
-          '${NetworkConfig.getBaseUrl()}/api/departments/departments');
-      print('Fetching departments from: $url with token: $token');
       final response = await http.get(
-        url,
-        headers: {
-          'Authorization': 'Bearer $token',
-          'Content-Type': 'application/json',
-        },
+        Uri.parse('${NetworkConfig.getBaseUrl()}/api/departments/departments'),
+        headers: {'Authorization': 'Bearer $token'},
       );
 
       print(
           'Fetch Departments Response: ${response.statusCode} - ${response.body}');
 
       if (response.statusCode == 200) {
+        final List<dynamic> fetchedData = jsonDecode(response.body);
+        print('Fetched Departments: $fetchedData');
         setState(() {
-          _departments = json.decode(response.body);
+          _departments = fetchedData.cast<Map<String, dynamic>>();
           _errorMessage = null;
-          print('Departments loaded: $_departments');
         });
-      } else if (response.statusCode == 401 || response.statusCode == 403) {
-        print('Unauthorized access detected (401/403), redirecting to login');
-        _redirectToLogin();
+      } else if (response.statusCode == 403) {
         setState(() {
-          _errorMessage = 'Unauthorized access. Please log in as an admin.';
+          _errorMessage = 'Admin access required to view departments.';
         });
       } else {
         setState(() {
-          _errorMessage =
-              'Failed to load departments: ${response.statusCode} - ${response.body}';
+          _errorMessage = 'Failed to fetch departments: ${response.statusCode}';
         });
       }
     } catch (e) {
       setState(() {
         _errorMessage = 'Error fetching departments: $e';
       });
-      print('Fetch error: $e');
     } finally {
       setState(() => _isLoading = false);
     }
   }
 
-  Future<void> createDepartment(String code, String name) async {
+  Future<void> addDepartment(String code, String name) async {
+    if (code.isEmpty || name.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Department code and name are required')),
+      );
+      return;
+    }
+
     setState(() => _isLoading = true);
     try {
       final prefs = await SharedPreferences.getInstance();
@@ -94,7 +89,7 @@ class DepartmentsPageState extends State<DepartmentsPage> {
 
       final url = Uri.parse(
           '${NetworkConfig.getBaseUrl()}/api/departments/departments');
-      print('Creating department at: $url with code: $code, name: $name');
+      print('Adding department at: $url with code: $code, name: $name');
       final response = await http.post(
         url,
         headers: {
@@ -108,22 +103,34 @@ class DepartmentsPageState extends State<DepartmentsPage> {
       );
 
       print(
-          'Create Department Response: ${response.statusCode} - ${response.body}');
+          'Add Department Response: ${response.statusCode} - ${response.body}');
 
       if (response.statusCode == 201) {
-        await fetchDepartments();
+        setState(() {
+          _departments.add({'departmentcode': code, 'departmentname': name});
+          _errorMessage = null;
+        });
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('Department created successfully')),
+            const SnackBar(content: Text('Department added successfully')),
           );
         }
       } else {
-        String errorMsg = response.statusCode == 403
-            ? 'Admin access required to create departments.'
-            : 'Failed to create department: ${response.statusCode} - ${response.body}';
+        String errorMsg;
+        if (response.statusCode == 400) {
+          errorMsg = 'Missing department code or name.';
+        } else if (response.statusCode == 403) {
+          errorMsg = 'Admin access required to add departments.';
+        } else if (response.statusCode == 409) {
+          errorMsg = 'Department code $code already exists.';
+        } else {
+          errorMsg =
+              'Failed to add department: ${response.statusCode} - ${response.body}';
+        }
         setState(() {
           _errorMessage = errorMsg;
         });
+        print('Add error: $errorMsg');
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(content: Text(errorMsg)),
@@ -131,11 +138,11 @@ class DepartmentsPageState extends State<DepartmentsPage> {
         }
       }
     } catch (e) {
-      String errorMsg = 'Error creating department: $e';
+      String errorMsg = 'Error adding department: $e';
       setState(() {
         _errorMessage = errorMsg;
       });
-      print('Create error: $e');
+      print('Add exception: $e');
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text(errorMsg)),
@@ -148,6 +155,13 @@ class DepartmentsPageState extends State<DepartmentsPage> {
 
   Future<void> updateDepartment(
       String departmentcode, String code, String name) async {
+    if (code.isEmpty || name.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Department code and name are required')),
+      );
+      return;
+    }
+
     setState(() => _isLoading = true);
     try {
       final prefs = await SharedPreferences.getInstance();
@@ -156,24 +170,6 @@ class DepartmentsPageState extends State<DepartmentsPage> {
       if (token == null) {
         print('No JWT token found, redirecting to login');
         _redirectToLogin();
-        return;
-      }
-
-      // Verify departmentcode exists in _departments
-      final deptExists =
-          _departments.any((dept) => dept['departmentcode'] == departmentcode);
-      if (!deptExists) {
-        setState(() {
-          _errorMessage = 'Department $departmentcode not found in local list.';
-        });
-        print(
-            'Local check: Department $departmentcode not found in _departments');
-        await fetchDepartments(); // Refresh to sync with backend
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text(_errorMessage ?? 'Department not found')),
-          );
-        }
         return;
       }
 
@@ -197,7 +193,17 @@ class DepartmentsPageState extends State<DepartmentsPage> {
           'Update Department Response: ${response.statusCode} - ${response.body}');
 
       if (response.statusCode == 200) {
-        await fetchDepartments();
+        setState(() {
+          final index = _departments
+              .indexWhere((dept) => dept['departmentcode'] == departmentcode);
+          if (index != -1) {
+            _departments[index] = {
+              'departmentcode': code,
+              'departmentname': name
+            };
+          }
+          _errorMessage = null;
+        });
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(content: Text('Department updated successfully')),
@@ -205,11 +211,15 @@ class DepartmentsPageState extends State<DepartmentsPage> {
         }
       } else {
         String errorMsg;
-        if (response.statusCode == 403) {
+        if (response.statusCode == 400) {
+          errorMsg = 'Missing department code or name.';
+        } else if (response.statusCode == 403) {
           errorMsg = 'Admin access required to update departments.';
         } else if (response.statusCode == 404) {
           errorMsg = 'Department $departmentcode not found on server.';
-          await fetchDepartments(); // Refresh list
+          await fetchDepartments();
+        } else if (response.statusCode == 409) {
+          errorMsg = 'New department code $code already exists.';
         } else {
           errorMsg =
               'Failed to update department: ${response.statusCode} - ${response.body}';
@@ -252,24 +262,6 @@ class DepartmentsPageState extends State<DepartmentsPage> {
         return;
       }
 
-      // Verify departmentcode exists in _departments
-      final deptExists =
-          _departments.any((dept) => dept['departmentcode'] == departmentcode);
-      if (!deptExists) {
-        setState(() {
-          _errorMessage = 'Department $departmentcode not found in local list.';
-        });
-        print(
-            'Local check: Department $departmentcode not found in _departments');
-        await fetchDepartments(); // Refresh to sync with backend
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text(_errorMessage ?? 'Department not found')),
-          );
-        }
-        return;
-      }
-
       final url = Uri.parse(
           '${NetworkConfig.getBaseUrl()}/api/departments/departments/$departmentcode');
       print('Deleting department at: $url with code: $departmentcode');
@@ -301,7 +293,7 @@ class DepartmentsPageState extends State<DepartmentsPage> {
           errorMsg = 'Admin access required to delete departments.';
         } else if (response.statusCode == 404) {
           errorMsg = 'Department $departmentcode not found on server.';
-          await fetchDepartments(); // Refresh list
+          await fetchDepartments();
         } else {
           errorMsg =
               'Failed to delete department: ${response.statusCode} - ${response.body}';
@@ -333,348 +325,69 @@ class DepartmentsPageState extends State<DepartmentsPage> {
   }
 
   void _redirectToLogin() {
-    if (mounted) {
-      Navigator.pushReplacementNamed(context, '/login');
-    }
-  }
-
-  void showCreateDialog() {
-    TextEditingController codeController = TextEditingController();
-    TextEditingController nameController = TextEditingController();
-
-    showDialog(
-      context: context,
-      builder: (context) {
-        return Dialog(
-          shape:
-              RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-          elevation: 4,
-          child: Container(
-            padding: const EdgeInsets.all(20),
-            width: MediaQuery.of(context).size.width * 0.9,
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    const Text(
-                      "Add Department",
-                      style:
-                          TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
-                    ),
-                    IconButton(
-                      icon: const Icon(Icons.close, color: Colors.grey),
-                      onPressed: () => Navigator.pop(context),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 16),
-                TextField(
-                  controller: codeController,
-                  decoration: InputDecoration(
-                    labelText: "Department Code",
-                    prefixIcon: const Icon(Icons.code),
-                    border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(12)),
-                    filled: true,
-                    fillColor: Colors.grey[100],
-                  ),
-                ),
-                const SizedBox(height: 12),
-                TextField(
-                  controller: nameController,
-                  decoration: InputDecoration(
-                    labelText: "Department Name",
-                    prefixIcon: const Icon(Icons.domain),
-                    border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(12)),
-                    filled: true,
-                    fillColor: Colors.grey[100],
-                  ),
-                ),
-                const SizedBox(height: 20),
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.end,
-                  children: [
-                    TextButton(
-                      onPressed: () => Navigator.pop(context),
-                      style: TextButton.styleFrom(
-                        foregroundColor: Colors.grey,
-                        padding: const EdgeInsets.symmetric(
-                            horizontal: 16, vertical: 8),
-                      ),
-                      child: const Text("Cancel"),
-                    ),
-                    const SizedBox(width: 8),
-                    ElevatedButton(
-                      onPressed: _isLoading
-                          ? null
-                          : () async {
-                              if (codeController.text.isEmpty ||
-                                  nameController.text.isEmpty) {
-                                if (mounted) {
-                                  ScaffoldMessenger.of(context).showSnackBar(
-                                    const SnackBar(
-                                        content:
-                                            Text("Please fill all fields")),
-                                  );
-                                }
-                                return;
-                              }
-                              await createDepartment(
-                                  codeController.text, nameController.text);
-                              if (mounted) Navigator.pop(context);
-                            },
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: Theme.of(context).primaryColor,
-                        padding: const EdgeInsets.symmetric(
-                            horizontal: 16, vertical: 8),
-                        shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(12)),
-                      ),
-                      child: _isLoading
-                          ? const SizedBox(
-                              width: 20,
-                              height: 20,
-                              child: CircularProgressIndicator(
-                                  color: Colors.white, strokeWidth: 2),
-                            )
-                          : const Text("Save",
-                              style: TextStyle(color: Colors.white)),
-                    ),
-                  ],
-                ),
-              ],
-            ),
-          ),
-        );
-      },
-    );
-  }
-
-  void showEditDialog(Map<String, dynamic> department) {
-    if (department['departmentcode'] == null ||
-        department['departmentname'] == null) {
-      print('Invalid department data: $department');
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Invalid department data')),
-      );
-      return;
-    }
-
-    TextEditingController codeController =
-        TextEditingController(text: department['departmentcode']);
-    TextEditingController nameController =
-        TextEditingController(text: department['departmentname']);
-
-    showDialog(
-      context: context,
-      builder: (context) {
-        return Dialog(
-          shape:
-              RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-          elevation: 4,
-          child: Container(
-            padding: const EdgeInsets.all(20),
-            width: MediaQuery.of(context).size.width * 0.9,
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    const Text(
-                      "Edit Department",
-                      style:
-                          TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
-                    ),
-                    IconButton(
-                      icon: const Icon(Icons.close, color: Colors.grey),
-                      onPressed: () => Navigator.pop(context),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 16),
-                TextField(
-                  controller: codeController,
-                  decoration: InputDecoration(
-                    labelText: "Department Code",
-                    prefixIcon: const Icon(Icons.code),
-                    border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(12)),
-                    filled: true,
-                    fillColor: Colors.grey[100],
-                  ),
-                ),
-                const SizedBox(height: 12),
-                TextField(
-                  controller: nameController,
-                  decoration: InputDecoration(
-                    labelText: "Department Name",
-                    prefixIcon: const Icon(Icons.domain),
-                    border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(12)),
-                    filled: true,
-                    fillColor: Colors.grey[100],
-                  ),
-                ),
-                const SizedBox(height: 20),
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.end,
-                  children: [
-                    TextButton(
-                      onPressed: () => Navigator.pop(context),
-                      style: TextButton.styleFrom(
-                        foregroundColor: Colors.grey,
-                        padding: const EdgeInsets.symmetric(
-                            horizontal: 16, vertical: 8),
-                      ),
-                      child: const Text("Cancel"),
-                    ),
-                    const SizedBox(width: 8),
-                    ElevatedButton(
-                      onPressed: _isLoading
-                          ? null
-                          : () async {
-                              if (codeController.text.isEmpty ||
-                                  nameController.text.isEmpty) {
-                                if (mounted) {
-                                  ScaffoldMessenger.of(context).showSnackBar(
-                                    const SnackBar(
-                                        content:
-                                            Text("Please fill all fields")),
-                                  );
-                                }
-                                return;
-                              }
-                              await updateDepartment(
-                                  department['departmentcode'],
-                                  codeController.text,
-                                  nameController.text);
-                              if (mounted) Navigator.pop(context);
-                            },
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: Theme.of(context).primaryColor,
-                        padding: const EdgeInsets.symmetric(
-                            horizontal: 16, vertical: 8),
-                        shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(12)),
-                      ),
-                      child: _isLoading
-                          ? const SizedBox(
-                              width: 20,
-                              height: 20,
-                              child: CircularProgressIndicator(
-                                  color: Colors.white, strokeWidth: 2),
-                            )
-                          : const Text("Save",
-                              style: TextStyle(color: Colors.white)),
-                    ),
-                  ],
-                ),
-              ],
-            ),
-          ),
-        );
-      },
-    );
+    Navigator.pushReplacementNamed(context, '/login');
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text("Departments"),
+        title: const Text('Departments'),
         backgroundColor: Theme.of(context).primaryColor,
-        elevation: 4,
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back),
-          onPressed: () {
-            Navigator.pushReplacement(
-              context,
-              MaterialPageRoute(builder: (context) => AdminDashboard()),
-            );
-          },
-        ),
+        foregroundColor: Colors.white,
         actions: [
           IconButton(
             icon: const Icon(Icons.add),
-            onPressed: _isLoading ? null : showCreateDialog,
+            onPressed: () => _showAddDialog(),
+            tooltip: 'Add Department',
           ),
         ],
       ),
       body: _isLoading
           ? const Center(child: CircularProgressIndicator())
-          : _errorMessage != null
-              ? Center(
-                  child: Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      Text(
-                        _errorMessage ?? 'An unknown error occurred',
-                        style: const TextStyle(color: Colors.red),
+          : _departments.isEmpty
+              ? const Center(child: Text('No departments available'))
+              : Column(
+                  children: [
+                    if (_errorMessage != null)
+                      Padding(
+                        padding: const EdgeInsets.all(8.0),
+                        child: Text(
+                          _errorMessage!,
+                          style: const TextStyle(color: Colors.red),
+                        ),
                       ),
-                      const SizedBox(height: 16),
-                      ElevatedButton(
-                        onPressed: fetchDepartments,
-                        child: const Text("Retry"),
-                      ),
-                    ],
-                  ),
-                )
-              : _departments.isEmpty
-                  ? const Center(
-                      child: Text("No departments available",
-                          style: TextStyle(fontSize: 16)))
-                  : Padding(
-                      padding: const EdgeInsets.all(8.0),
+                    Expanded(
                       child: ListView.builder(
                         itemCount: _departments.length,
                         itemBuilder: (context, index) {
-                          final department = _departments[index];
+                          final dept = _departments[index];
                           return Card(
+                            margin: const EdgeInsets.symmetric(
+                                horizontal: 16.0, vertical: 8.0),
                             elevation: 2,
-                            margin: const EdgeInsets.symmetric(vertical: 6.0),
-                            shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(12)),
                             child: ListTile(
-                              leading: CircleAvatar(
-                                backgroundColor: Theme.of(context).primaryColor,
-                                child: const Icon(Icons.domain,
-                                    color: Colors.white),
-                              ),
                               title: Text(
-                                department['departmentname'] ?? 'Unknown',
+                                dept['departmentname'],
                                 style: const TextStyle(
-                                    fontSize: 18, fontWeight: FontWeight.bold),
+                                    fontWeight: FontWeight.bold),
                               ),
-                              subtitle: Text(
-                                "Code: ${department['departmentcode'] ?? 'N/A'}",
-                                style: TextStyle(
-                                    fontSize: 14, color: Colors.grey[700]),
-                              ),
+                              subtitle: Text('Code: ${dept['departmentcode']}'),
                               trailing: Row(
                                 mainAxisSize: MainAxisSize.min,
                                 children: [
                                   IconButton(
                                     icon: const Icon(Icons.edit,
                                         color: Colors.blue),
-                                    onPressed: _isLoading
-                                        ? null
-                                        : () => showEditDialog(department),
-                                    tooltip: 'Edit Department',
+                                    onPressed: () => _showUpdateDialog(
+                                        dept['departmentcode'],
+                                        dept['departmentname']),
                                   ),
                                   IconButton(
                                     icon: const Icon(Icons.delete,
                                         color: Colors.red),
-                                    onPressed: _isLoading
-                                        ? null
-                                        : () => deleteDepartment(
-                                            department['departmentcode']),
-                                    tooltip: 'Delete Department',
+                                    onPressed: () => _showDeleteConfirmation(
+                                        dept['departmentcode']),
                                   ),
                                 ],
                               ),
@@ -683,6 +396,208 @@ class DepartmentsPageState extends State<DepartmentsPage> {
                         },
                       ),
                     ),
+                  ],
+                ),
+    );
+  }
+
+  void _showAddDialog() {
+    final codeController = TextEditingController();
+    final nameController = TextEditingController();
+    String? codeError;
+    String? nameError;
+
+    showDialog(
+      context: context,
+      builder: (context) {
+        return StatefulBuilder(
+          builder: (context, setDialogState) {
+            return AlertDialog(
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(16.0),
+              ),
+              elevation: 8,
+              backgroundColor: Colors.white,
+              title: Row(
+                children: [
+                  const Icon(Icons.add_circle, color: Color(0xFF0C6170)),
+                  const SizedBox(width: 8),
+                  Text(
+                    'Add Department',
+                    style: TextStyle(
+                      color: Theme.of(context).primaryColor,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                ],
+              ),
+              content: SizedBox(
+                width: 300, // Wider dialog for better usability
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    TextField(
+                      controller: codeController,
+                      decoration: InputDecoration(
+                        labelText: 'Department Code',
+                        hintText: 'e.g., CS',
+                        labelStyle: const TextStyle(color: Color(0xFF0C6170)),
+                        hintStyle: const TextStyle(color: Colors.grey),
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(12.0),
+                        ),
+                        focusedBorder: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(12.0),
+                          borderSide: const BorderSide(
+                              color: Color(0xFF0C6170), width: 2),
+                        ),
+                        errorText: codeError,
+                      ),
+                      onChanged: (value) {
+                        setDialogState(() {
+                          codeError = value.isEmpty ? 'Code is required' : null;
+                        });
+                      },
+                    ),
+                    const SizedBox(height: 16),
+                    TextField(
+                      controller: nameController,
+                      decoration: InputDecoration(
+                        labelText: 'Department Name',
+                        hintText: 'e.g., Computer Science',
+                        labelStyle: const TextStyle(color: Color(0xFF0C6170)),
+                        hintStyle: const TextStyle(color: Colors.grey),
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(12.0),
+                        ),
+                        focusedBorder: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(12.0),
+                          borderSide: const BorderSide(
+                              color: Color(0xFF0C6170), width: 2),
+                        ),
+                        errorText: nameError,
+                      ),
+                      onChanged: (value) {
+                        setDialogState(() {
+                          nameError = value.isEmpty ? 'Name is required' : null;
+                        });
+                      },
+                    ),
+                  ],
+                ),
+              ),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.pop(context),
+                  child: const Text(
+                    'Cancel',
+                    style: TextStyle(color: Colors.grey),
+                  ),
+                ),
+                ElevatedButton(
+                  onPressed: (codeError == null &&
+                          nameError == null &&
+                          codeController.text.isNotEmpty &&
+                          nameController.text.isNotEmpty)
+                      ? () {
+                          Navigator.pop(context);
+                          addDepartment(codeController.text.trim(),
+                              nameController.text.trim());
+                        }
+                      : null, // Disabled if validation fails
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: const Color(0xFF0C6170),
+                    foregroundColor: Colors.white,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12.0),
+                    ),
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 20, vertical: 10),
+                  ),
+                  child: const Text('Add'),
+                ),
+              ],
+            );
+          },
+        );
+      },
+    );
+  }
+
+  void _showUpdateDialog(String currentCode, String currentName) {
+    final codeController = TextEditingController(text: currentCode);
+    final nameController = TextEditingController(text: currentName);
+
+    showDialog(
+      context: context,
+      builder: (context) {
+        return AlertDialog(
+          title: const Text('Update Department'),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              TextField(
+                controller: codeController,
+                decoration: const InputDecoration(
+                  labelText: 'Department Code',
+                  border: OutlineInputBorder(),
+                ),
+              ),
+              const SizedBox(height: 12),
+              TextField(
+                controller: nameController,
+                decoration: const InputDecoration(
+                  labelText: 'Department Name',
+                  border: OutlineInputBorder(),
+                ),
+              ),
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text('Cancel'),
+            ),
+            ElevatedButton(
+              onPressed: () {
+                Navigator.pop(context);
+                updateDepartment(
+                  currentCode,
+                  codeController.text.trim(),
+                  nameController.text.trim(),
+                );
+              },
+              child: const Text('Update'),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+  void _showDeleteConfirmation(String departmentcode) {
+    showDialog(
+      context: context,
+      builder: (context) {
+        return AlertDialog(
+          title: const Text('Delete Department'),
+          content: Text('Are you sure you want to delete $departmentcode?'),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text('Cancel'),
+            ),
+            ElevatedButton(
+              onPressed: () {
+                Navigator.pop(context);
+                deleteDepartment(departmentcode);
+              },
+              style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
+              child: const Text('Delete'),
+            ),
+          ],
+        );
+      },
     );
   }
 }
@@ -1576,13 +1491,145 @@ class _UsersPageState extends State<UsersPage> {
 
 ============================
 
-frontend/lib/hod_screens/hod_dashboard.dart:
+frontend/lib/hod_screens/academics_page.dart:
+
+contents:
+import 'package:flutter/material.dart';
+
+class AcademicsPage extends StatelessWidget {
+  const AcademicsPage({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    return const Center(
+      child: Text(
+        'Academics Page\n(Under Development)',
+        style: TextStyle(fontSize: 24, color: Colors.blueAccent),
+        textAlign: TextAlign.center,
+      ),
+    );
+  }
+}
+
+============================
+
+frontend/lib/hod_screens/announcements_page.dart:
+
+contents:
+import 'package:flutter/material.dart';
+
+class AnnouncementsPage extends StatelessWidget {
+  const AnnouncementsPage({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    return const Center(
+      child: Text(
+        'Announcements Page\n(Under Development)',
+        style: TextStyle(fontSize: 24, color: Colors.blueAccent),
+        textAlign: TextAlign.center,
+      ),
+    );
+  }
+}
+
+============================
+
+frontend/lib/hod_screens/dashboard_page.dart:
+
+contents:
+import 'package:flutter/material.dart';
+import '../shared/department_staff_page.dart';
+import '../shared/department_users_page.dart';
+
+class DashboardPage extends StatelessWidget {
+  const DashboardPage({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.all(16.0),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          const Text(
+            "Welcome, HOD!",
+            style: TextStyle(
+                fontSize: 24,
+                fontWeight: FontWeight.bold,
+                color: Colors.blueAccent),
+            textAlign: TextAlign.center,
+          ),
+          const SizedBox(height: 20),
+          ElevatedButton.icon(
+            onPressed: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (context) => const DepartmentStaffPage(),
+                ),
+              );
+            },
+            icon: const Icon(Icons.person),
+            label: const Text("Manage Department Staff"),
+            style: ElevatedButton.styleFrom(
+              padding: const EdgeInsets.symmetric(vertical: 12),
+              shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12)),
+            ),
+          ),
+          const SizedBox(height: 16),
+          ElevatedButton.icon(
+            onPressed: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (context) =>
+                      const DepartmentUsersPage(isStaffView: false),
+                ),
+              );
+            },
+            icon: const Icon(Icons.school),
+            label: const Text("Manage Department Students"),
+            style: ElevatedButton.styleFrom(
+              padding: const EdgeInsets.symmetric(vertical: 12),
+              shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12)),
+            ),
+          ),
+          const SizedBox(height: 16),
+          ElevatedButton.icon(
+            onPressed: () {
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(content: Text("HOD feature coming soon!")),
+              );
+            },
+            icon: const Icon(Icons.check_circle),
+            label: const Text("Approve Requests"),
+            style: ElevatedButton.styleFrom(
+              padding: const EdgeInsets.symmetric(vertical: 12),
+              shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12)),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+============================
+
+frontend/lib/hod_screens/hod.dart:
 
 contents:
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'dashboard_page.dart';
+import 'academics_page.dart';
+import 'announcements_page.dart';
 import '../shared/department_users_page.dart';
-import '../shared/department_staff_page.dart';
+import 'staff_settings_page.dart';
 
 class HodDashboard extends StatefulWidget {
   const HodDashboard({super.key});
@@ -1592,6 +1639,17 @@ class HodDashboard extends StatefulWidget {
 }
 
 class _HodDashboardState extends State<HodDashboard> {
+  int _selectedIndex = 0; // Default to "Dashboard" tab
+
+  // Define pages for each tab
+  static const List<Widget> _pages = <Widget>[
+    DashboardPage(), // Tab 0: Dashboard
+    AcademicsPage(), // Tab 1: Academics
+    AnnouncementsPage(), // Tab 2: Announcements
+    DepartmentUsersPage(isStaffView: false), // Tab 3: Students
+    SettingsPage(), // Tab 4: Settings
+  ];
+
   @override
   void initState() {
     super.initState();
@@ -1603,6 +1661,12 @@ class _HodDashboardState extends State<HodDashboard> {
     await prefs.remove('user_role');
     await prefs.remove('departmentcode');
     Navigator.pushReplacementNamed(context, '/login');
+  }
+
+  void _onItemTapped(int index) {
+    setState(() {
+      _selectedIndex = index;
+    });
   }
 
   @override
@@ -1620,73 +1684,84 @@ class _HodDashboardState extends State<HodDashboard> {
           ),
         ],
       ),
-      body: Padding(
-        padding: const EdgeInsets.all(16.0),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            const Text(
-              "Welcome, HOD!",
-              style: TextStyle(
-                  fontSize: 24,
-                  fontWeight: FontWeight.bold,
-                  color: Colors.blueAccent),
-              textAlign: TextAlign.center,
+      body: _pages[_selectedIndex], // Display the selected page
+      bottomNavigationBar: BottomNavigationBar(
+        items: const <BottomNavigationBarItem>[
+          BottomNavigationBarItem(
+            icon: Icon(Icons.dashboard),
+            label: 'Dashboard',
+          ),
+          BottomNavigationBarItem(
+            icon: Icon(Icons.book),
+            label: 'Academics',
+          ),
+          BottomNavigationBarItem(
+            icon: Icon(Icons.announcement),
+            label: 'Announcements',
+          ),
+          BottomNavigationBarItem(
+            icon: Icon(Icons.school),
+            label: 'Students',
+          ),
+          BottomNavigationBarItem(
+            icon: Icon(Icons.settings),
+            label: 'Settings',
+          ),
+        ],
+        currentIndex: _selectedIndex,
+        selectedItemColor: Colors.blueAccent,
+        unselectedItemColor: Colors.grey,
+        backgroundColor: Colors.white,
+        type: BottomNavigationBarType.fixed,
+        onTap: _onItemTapped,
+      ),
+    );
+  }
+}
+
+============================
+
+frontend/lib/hod_screens/staff_settings_page.dart:
+
+contents:
+import 'package:flutter/material.dart';
+
+class SettingsPage extends StatelessWidget {
+  const SettingsPage({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.all(16.0),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          const Text(
+            'Settings',
+            style: TextStyle(
+              fontSize: 24,
+              fontWeight: FontWeight.bold,
+              color: Colors.blueAccent,
             ),
-            const SizedBox(height: 20),
-            ElevatedButton.icon(
-              onPressed: () {
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                    builder: (context) => const DepartmentStaffPage(),
-                  ),
-                );
-              },
-              icon: const Icon(Icons.person),
-              label: const Text("Manage Department Staff"),
-              style: ElevatedButton.styleFrom(
-                padding: const EdgeInsets.symmetric(vertical: 12),
-                shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(12)),
-              ),
+            textAlign: TextAlign.center,
+          ),
+          const SizedBox(height: 20),
+          ElevatedButton.icon(
+            onPressed: () {
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(
+                    content: Text("Profile management coming soon!")),
+              );
+            },
+            icon: const Icon(Icons.person),
+            label: const Text("Manage Profile"),
+            style: ElevatedButton.styleFrom(
+              padding: const EdgeInsets.symmetric(vertical: 12),
+              shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12)),
             ),
-            const SizedBox(height: 16),
-            ElevatedButton.icon(
-              onPressed: () {
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                    builder: (context) =>
-                        const DepartmentUsersPage(isStaffView: false),
-                  ),
-                );
-              },
-              icon: const Icon(Icons.school),
-              label: const Text("Manage Department Students"),
-              style: ElevatedButton.styleFrom(
-                padding: const EdgeInsets.symmetric(vertical: 12),
-                shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(12)),
-              ),
-            ),
-            const SizedBox(height: 16),
-            ElevatedButton.icon(
-              onPressed: () {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(content: Text("HOD feature coming soon!")),
-                );
-              },
-              icon: const Icon(Icons.check_circle),
-              label: const Text("Approve Requests"),
-              style: ElevatedButton.styleFrom(
-                padding: const EdgeInsets.symmetric(vertical: 12),
-                shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(12)),
-              ),
-            ),
-          ],
-        ),
+          ),
+        ],
       ),
     );
   }
@@ -1704,8 +1779,9 @@ import 'screens/login.dart';
 import 'screens/home.dart';
 import 'screens/chatbot.dart';
 import 'screens/admin_dashboard.dart';
-import 'staff_screens/staff_dashboard.dart'; // Add StaffDashboard import
-import 'hod_screens/hod_dashboard.dart'; // Add HodDashboard import
+import 'staff_screens/staff.dart';
+import 'hod_screens/hod.dart';
+import 'admin_screens/departments_page.dart';
 
 void main() {
   runApp(const MyApp());
@@ -1730,27 +1806,61 @@ class MyAppState extends State<MyApp> {
   }
 
   Future<void> _loadUserData() async {
-    SharedPreferences prefs = await SharedPreferences.getInstance();
+    try {
+      SharedPreferences prefs = await SharedPreferences.getInstance();
 
-    await Future.delayed(const Duration(seconds: 2));
+      debugPrint(
+          'Starting _loadUserData - All SharedPreferences keys: ${prefs.getKeys()}');
+      debugPrint(
+          'Raw user_role from SharedPreferences: ${prefs.getString('user_role')}');
+      debugPrint(
+          'Raw jwt_token from SharedPreferences: ${prefs.getString('jwt_token')}');
 
-    setState(() {
-      jwtToken = prefs.getString('jwt_token');
-      userData = {
-        "name": prefs.getString('name') ?? "Guest",
-        "email": prefs.getString('email') ?? "N/A",
-        "phone": prefs.getString('phone') ?? "N/A",
-        "admission_number": prefs.getString('admission_number') ?? "N/A",
-        "role": prefs.getString('role') ?? "N/A",
-      };
-      isLoading = false;
-    });
+      // Ensure splash screen is visible for at least 2 seconds
+      await Future.delayed(const Duration(seconds: 2));
 
-    debugPrint("✅ Loaded User Data: $userData");
+      setState(() {
+        jwtToken = prefs.getString('jwt_token');
+        String? rawRole = prefs.getString('user_role');
+        userData = {
+          "name": prefs.getString('username') ?? "Guest",
+          "email": prefs.getString('email') ?? "N/A",
+          "phone": prefs.getString('phone') ?? "N/A",
+          "admission_number": prefs.getString('admission_number') ?? "N/A",
+          "role": rawRole ?? "N/A",
+        };
+        debugPrint('After setState - userData[role]: ${userData['role']}');
+        isLoading = false;
+      });
+
+      debugPrint("✅ Loaded User Data: $userData");
+    } catch (e) {
+      debugPrint('Error loading user data: $e');
+      setState(() {
+        isLoading = false; // Proceed to login screen on error
+      });
+    }
   }
 
   @override
   Widget build(BuildContext context) {
+    debugPrint('Building MyApp - isLoading: $isLoading, jwtToken: $jwtToken');
+    if (isLoading) {
+      return MaterialApp(
+        title: 'Campus Connect',
+        theme: ThemeData(
+          primaryColor: const Color(0xFF0C6170),
+          hintColor: const Color(0xFF37BEB0),
+          scaffoldBackgroundColor: const Color(0xFFDBF5F0),
+        ),
+        debugShowCheckedModeBanner: false,
+        home: const SplashScreen(),
+      );
+    }
+
+    Widget homeScreen =
+        jwtToken == null ? LoginScreen() : _getHomeScreenBasedOnRole();
+
     return MaterialApp(
       title: 'Campus Connect',
       theme: ThemeData(
@@ -1759,11 +1869,7 @@ class MyAppState extends State<MyApp> {
         scaffoldBackgroundColor: const Color(0xFFDBF5F0),
       ),
       debugShowCheckedModeBanner: false,
-      home: isLoading
-          ? const SplashScreen()
-          : jwtToken == null
-              ? LoginScreen()
-              : _getHomeScreenBasedOnRole(), // Updated to handle all roles
+      home: homeScreen,
       routes: {
         '/login': (context) => LoginScreen(),
         '/home': (context) => HomeScreen(
@@ -1772,12 +1878,13 @@ class MyAppState extends State<MyApp> {
                   {"name": "Guest"},
             ),
         '/chatbot': (context) => ChatbotPage(),
+        '/departments': (context) => const DepartmentPage(),
       },
     );
   }
 
-  // New method to determine the home screen based on role
   Widget _getHomeScreenBasedOnRole() {
+    debugPrint("Navigating based on role: ${userData['role']}");
     switch (userData['role']) {
       case 'admin':
         return AdminDashboard();
@@ -1785,10 +1892,10 @@ class MyAppState extends State<MyApp> {
         return const StaffDashboard();
       case 'hod':
         return const HodDashboard();
-      case 'student': // Explicitly handle student role
+      case 'student':
         return HomeScreen(userData: userData);
       default:
-        return LoginScreen(); // Fallback to login for unknown roles
+        return LoginScreen();
     }
   }
 }
@@ -1983,8 +2090,7 @@ class _AdminDashboardState extends State<AdminDashboard> {
               Navigator.pop(context); // Close drawer
               Navigator.push(
                 context,
-                MaterialPageRoute(
-                    builder: (context) => const DepartmentsPage()),
+                MaterialPageRoute(builder: (context) => const DepartmentPage()),
               );
             },
           ),
@@ -2829,69 +2935,6 @@ class _ChatbotPageState extends State<ChatbotPage> {
 
 ============================
 
-frontend/lib/screens/hod_dashboard.dart:
-
-contents:
-import 'package:flutter/material.dart';
-
-class HODDashboard extends StatelessWidget {
-  final VoidCallback logout;
-  HODDashboard({required this.logout});
-
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(title: Text("HOD Dashboard")),
-      drawer: Drawer(
-        child: ListView(
-          padding: EdgeInsets.zero,
-          children: [
-            DrawerHeader(
-              decoration: BoxDecoration(color: Colors.blue),
-              child: Text("HOD Panel",
-                  style: TextStyle(color: Colors.white, fontSize: 24)),
-            ),
-            ListTile(
-              title: Text("Manage Results"),
-              onTap: () => Navigator.push(context,
-                  MaterialPageRoute(builder: (_) => ResultsApprovalPage())),
-            ),
-            ListTile(
-              title: Text("Manage Events"),
-              onTap: () => Navigator.push(
-                  context, MaterialPageRoute(builder: (_) => EventsPage())),
-            ),
-            ListTile(title: Text("Logout"), onTap: logout),
-          ],
-        ),
-      ),
-      body: Center(child: Text("Welcome to HOD Dashboard")),
-    );
-  }
-}
-
-class ResultsApprovalPage extends StatelessWidget {
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(title: Text("Manage Results")),
-      body: Center(child: Text("Results Approval - TBD")),
-    );
-  }
-}
-
-class EventsPage extends StatelessWidget {
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(title: Text("Manage Events")),
-      body: Center(child: Text("Events Management - TBD")),
-    );
-  }
-}
-
-============================
-
 frontend/lib/screens/home.dart:
 
 contents:
@@ -3093,8 +3136,8 @@ import 'dart:convert';
 import '../utils/network_config.dart';
 import 'home.dart';
 import 'admin_dashboard.dart';
-import '../staff_screens/staff_dashboard.dart';
-import '../hod_screens/hod_dashboard.dart';
+import '../staff_screens/staff.dart';
+import '../hod_screens/hod.dart';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
@@ -3120,35 +3163,41 @@ class LoginScreenState extends State<LoginScreen> {
   Future<void> _checkUserRole() async {
     SharedPreferences prefs = await SharedPreferences.getInstance();
     String? token = prefs.getString('jwt_token');
-    String? role =
-        prefs.getString('user_role'); // Updated to 'user_role' to match backend
+    String? role = prefs.getString('user_role');
+
+    debugPrint(
+        'Starting _checkUserRole - All SharedPreferences keys: ${prefs.getKeys()}');
+    debugPrint('JWT Token: $token');
+    debugPrint('User Role from SharedPreferences: $role');
 
     if (token != null) {
       if (role == 'admin') {
+        debugPrint('Redirecting to AdminDashboard');
         Navigator.pushReplacement(
           context,
           MaterialPageRoute(builder: (context) => const AdminDashboard()),
         );
       } else if (role == 'staff') {
+        debugPrint('Redirecting to StaffDashboard');
         Navigator.pushReplacement(
           context,
           MaterialPageRoute(builder: (context) => const StaffDashboard()),
         );
       } else if (role == 'hod') {
+        debugPrint('Redirecting to HodDashboard');
         Navigator.pushReplacement(
           context,
           MaterialPageRoute(builder: (context) => const HodDashboard()),
         );
       } else if (role == 'student') {
+        debugPrint('Redirecting to HomeScreen');
         Navigator.pushReplacement(
           context,
           MaterialPageRoute(
             builder: (context) => HomeScreen(userData: {
-              'name': prefs.getString('username') ??
-                  "User", // Updated to 'username'
+              'name': prefs.getString('username') ?? "User",
               'email': prefs.getString('email') ?? "N/A",
-              'phone': prefs.getString('phone_number') ??
-                  "N/A", // Updated to 'phone_number'
+              'phone': prefs.getString('phone_number') ?? "N/A",
               'admission_number': prefs.getString('admission_number') ?? "",
             }),
           ),
@@ -3183,46 +3232,52 @@ class LoginScreenState extends State<LoginScreen> {
         }),
       );
 
-      print('Login Response: ${response.statusCode} - ${response.body}');
+      debugPrint('Login Response: ${response.statusCode} - ${response.body}');
 
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body);
         SharedPreferences prefs = await SharedPreferences.getInstance();
         await prefs.setString('jwt_token', data['token']);
-        await prefs.setString(
-            'user_role', data['user']['role']); // Updated to 'user_role'
-        await prefs.setString(
-            'username', data['user']['username']); // Updated to 'username'
+        await prefs.setString('user_role', data['user']['role']);
+        await prefs.setString('username', data['user']['username']);
         await prefs.setString('email', data['user']['email']);
-        await prefs.setString('phone_number',
-            data['user']['phone_number'] ?? 'N/A'); // Updated to 'phone_number'
+        await prefs.setString(
+            'phone_number', data['user']['phone_number'] ?? 'N/A');
         await prefs.setString(
             'admission_number', data['user']['admission_number']);
         await prefs.setString(
-            'departmentcode',
-            data['user']['departmentcode'] ??
-                ''); // Already present, kept for consistency
+            'departmentcode', data['user']['departmentcode'] ?? '');
+
+        debugPrint('Saved user_role: ${data['user']['role']}');
+        debugPrint(
+            'Post-save - All SharedPreferences keys: ${prefs.getKeys()}');
+        debugPrint(
+            'Post-save - Verified user_role: ${prefs.getString('user_role')}');
 
         switch (data['user']['role']) {
           case 'admin':
+            debugPrint('Redirecting to AdminDashboard');
             Navigator.pushReplacement(
               context,
               MaterialPageRoute(builder: (context) => const AdminDashboard()),
             );
             break;
           case 'staff':
+            debugPrint('Redirecting to StaffDashboard');
             Navigator.pushReplacement(
               context,
               MaterialPageRoute(builder: (context) => const StaffDashboard()),
             );
             break;
           case 'hod':
+            debugPrint('Redirecting to HodDashboard');
             Navigator.pushReplacement(
               context,
               MaterialPageRoute(builder: (context) => const HodDashboard()),
             );
             break;
           case 'student':
+            debugPrint('Redirecting to HomeScreen');
             Navigator.pushReplacement(
               context,
               MaterialPageRoute(
@@ -3358,11 +3413,11 @@ class _ProfilePageState extends State<ProfilePage> {
   String role = "";
   String email = "";
   String phone = "";
-  String name = "User";
+  String username = "User";
   String department = "";
   String profileImagePath = "";
 
-  final TextEditingController nameController = TextEditingController();
+  final TextEditingController usernameController = TextEditingController();
   final TextEditingController emailController = TextEditingController();
   final TextEditingController phoneController = TextEditingController();
   final TextEditingController otpController = TextEditingController();
@@ -3378,30 +3433,68 @@ class _ProfilePageState extends State<ProfilePage> {
     SharedPreferences prefs = await SharedPreferences.getInstance();
     setState(() {
       admissionNumber = prefs.getString('admission_number') ?? "N/A";
-      role = prefs.getString('role') ?? "N/A";
+      role = prefs.getString('user_role') ?? "N/A";
       email = prefs.getString('email') ?? "N/A";
-      phone = prefs.getString('phone') ?? "N/A";
-      name = prefs.getString('name') ?? "User";
-      department = prefs.getString('department') ?? "Unknown";
+      phone = prefs.getString('phone_number') ?? "N/A";
+      username = prefs.getString('username') ?? "User";
+      department = prefs.getString('departmentcode') ?? "Unknown";
       profileImagePath = prefs.getString('profile_image') ?? "";
     });
 
-    nameController.text = name;
+    usernameController.text = username;
     emailController.text = email;
     phoneController.text = phone;
   }
 
   Future<void> _updateUserData() async {
     SharedPreferences prefs = await SharedPreferences.getInstance();
-    await prefs.setString('name', nameController.text);
-    await prefs.setString('phone', phoneController.text);
+    String? token = prefs.getString('jwt_token');
 
-    setState(() {
-      name = nameController.text;
-      phone = phoneController.text;
-    });
+    if (token == null) {
+      Navigator.pushReplacementNamed(context, '/login');
+      return;
+    }
 
-    Navigator.pop(context);
+    // Update local SharedPreferences
+    await prefs.setString('username', usernameController.text);
+    await prefs.setString('phone_number', phoneController.text);
+
+    // Update backend
+    try {
+      final response = await http.put(
+        Uri.parse('${NetworkConfig.getBaseUrl()}/api/users/update_profile'),
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer $token',
+        },
+        body: jsonEncode({
+          'admission_number': admissionNumber,
+          'username': usernameController.text,
+          'phone_number': phoneController.text,
+        }),
+      );
+
+      if (response.statusCode == 200) {
+        setState(() {
+          username = usernameController.text;
+          phone = phoneController.text;
+        });
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Profile updated successfully')),
+        );
+        Navigator.pop(context);
+      } else {
+        final errorData = jsonDecode(response.body);
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+              content: Text('Failed to update profile: ${errorData['error']}')),
+        );
+      }
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Error updating profile: $e')),
+      );
+    }
   }
 
   Future<void> _requestOtp() async {
@@ -3484,7 +3577,7 @@ class _ProfilePageState extends State<ProfilePage> {
   Future<void> _logout() async {
     SharedPreferences prefs = await SharedPreferences.getInstance();
     await prefs.clear();
-    Navigator.of(context).pushReplacementNamed('/login');
+    Navigator.pushReplacementNamed(context, '/login');
   }
 
   Future<void> _pickProfileImage() async {
@@ -3503,41 +3596,76 @@ class _ProfilePageState extends State<ProfilePage> {
 
   @override
   Widget build(BuildContext context) {
-    return SingleChildScrollView(
+    return Scaffold(
+      body: SingleChildScrollView(
+        child: Column(
+          children: [
+            _buildProfileHeader(),
+            const SizedBox(height: 20),
+            _buildInfoCard(),
+            const SizedBox(height: 20),
+            _buildActionButtons(),
+            const SizedBox(height: 20),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildProfileHeader() {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(16.0),
+      decoration: BoxDecoration(
+        color: Theme.of(context).primaryColor,
+        borderRadius: const BorderRadius.only(
+          bottomLeft: Radius.circular(30),
+          bottomRight: Radius.circular(30),
+        ),
+      ),
       child: Column(
         children: [
-          const SizedBox(height: 20),
           GestureDetector(
             onTap: _pickProfileImage,
-            child: CircleAvatar(
-              radius: 50,
-              backgroundImage: profileImagePath.isNotEmpty
-                  ? FileImage(File(profileImagePath)) as ImageProvider
-                  : const AssetImage('assets/default_profile.png'),
-              child: Align(
-                alignment: Alignment.bottomRight,
-                child: CircleAvatar(
+            child: Stack(
+              alignment: Alignment.bottomRight,
+              children: [
+                CircleAvatar(
+                  radius: 60,
                   backgroundColor: Colors.white,
-                  radius: 15,
-                  child: Icon(Icons.camera_alt,
-                      color: Theme.of(context).primaryColor, size: 20),
+                  backgroundImage: profileImagePath.isNotEmpty
+                      ? FileImage(File(profileImagePath)) as ImageProvider
+                      : const AssetImage('assets/default_profile.png'),
                 ),
-              ),
+                CircleAvatar(
+                  radius: 18,
+                  backgroundColor: Colors.white,
+                  child: Icon(
+                    Icons.camera_alt,
+                    color: Theme.of(context).primaryColor,
+                    size: 24,
+                  ),
+                ),
+              ],
             ),
           ),
-          const SizedBox(height: 10),
+          const SizedBox(height: 12),
           Text(
-            name,
-            style: const TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
+            username,
+            style: const TextStyle(
+              fontSize: 28,
+              fontWeight: FontWeight.bold,
+              color: Colors.white,
+            ),
           ),
+          const SizedBox(height: 4),
           Text(
             '$department - ${role.toUpperCase()}',
-            style: const TextStyle(fontSize: 16, color: Colors.grey),
+            style: const TextStyle(
+              fontSize: 16,
+              color: Colors.white70,
+            ),
           ),
-          const SizedBox(height: 20),
-          _buildInfoCard(),
-          const SizedBox(height: 20),
-          _buildActionButtons(),
         ],
       ),
     );
@@ -3546,67 +3674,99 @@ class _ProfilePageState extends State<ProfilePage> {
   Widget _buildInfoCard() {
     return Card(
       margin: const EdgeInsets.symmetric(horizontal: 16.0),
+      elevation: 4,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
       child: Padding(
         padding: const EdgeInsets.all(16.0),
         child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            _buildInfoRow(Icons.email, email),
+            const Text(
+              'Personal Information',
+              style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+            ),
+            const SizedBox(height: 12),
+            _buildInfoRow(Icons.email, 'Email', email),
             const Divider(),
-            _buildInfoRow(Icons.phone, phone),
+            _buildInfoRow(Icons.phone, 'Phone', phone),
             const Divider(),
-            _buildInfoRow(Icons.school, 'Admission No: $admissionNumber'),
+            _buildInfoRow(Icons.school, 'Admission No', admissionNumber),
           ],
         ),
       ),
     );
   }
 
-  Widget _buildInfoRow(IconData icon, String text) {
+  Widget _buildInfoRow(IconData icon, String label, String value) {
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 8.0),
       child: Row(
         children: [
-          Icon(icon, color: Colors.grey),
-          const SizedBox(width: 10),
-          Text(text),
+          Icon(icon, color: Theme.of(context).primaryColor, size: 24),
+          const SizedBox(width: 12),
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                label,
+                style: const TextStyle(fontSize: 12, color: Colors.grey),
+              ),
+              Text(
+                value,
+                style: const TextStyle(fontSize: 16),
+              ),
+            ],
+          ),
         ],
       ),
     );
   }
 
   Widget _buildActionButtons() {
-    return Column(
-      children: [
-        ElevatedButton(
-          onPressed: _showEditProfileDialog,
-          style: ElevatedButton.styleFrom(
-            backgroundColor: Theme.of(context).primaryColor,
-            foregroundColor: Colors.white,
-            minimumSize: const Size(200, 40),
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 16.0),
+      child: Column(
+        children: [
+          ElevatedButton.icon(
+            onPressed: _showEditProfileDialog,
+            icon: const Icon(Icons.edit),
+            label: const Text('Edit Profile'),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Theme.of(context).primaryColor,
+              foregroundColor: Colors.white,
+              minimumSize: const Size(double.infinity, 50),
+              shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12)),
+            ),
           ),
-          child: const Text('Edit Profile'),
-        ),
-        const SizedBox(height: 10),
-        ElevatedButton(
-          onPressed: _requestOtp,
-          style: ElevatedButton.styleFrom(
-            backgroundColor: Colors.orange,
-            foregroundColor: Colors.white,
-            minimumSize: const Size(200, 40),
+          const SizedBox(height: 12),
+          ElevatedButton.icon(
+            onPressed: _requestOtp,
+            icon: const Icon(Icons.lock),
+            label: const Text('Change Password'),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.orange,
+              foregroundColor: Colors.white,
+              minimumSize: const Size(double.infinity, 50),
+              shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12)),
+            ),
           ),
-          child: const Text('Change Password'),
-        ),
-        const SizedBox(height: 10),
-        ElevatedButton(
-          onPressed: _logout,
-          style: ElevatedButton.styleFrom(
-            backgroundColor: Colors.red,
-            foregroundColor: Colors.white,
-            minimumSize: const Size(200, 40),
+          const SizedBox(height: 12),
+          ElevatedButton.icon(
+            onPressed: _logout,
+            icon: const Icon(Icons.logout),
+            label: const Text('Logout'),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.red,
+              foregroundColor: Colors.white,
+              minimumSize: const Size(double.infinity, 50),
+              shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12)),
+            ),
           ),
-          child: const Text('Logout'),
-        ),
-      ],
+        ],
+      ),
     );
   }
 
@@ -3614,32 +3774,70 @@ class _ProfilePageState extends State<ProfilePage> {
     showDialog(
       context: context,
       builder: (context) {
-        return AlertDialog(
-          title: const Text("Edit Profile"),
-          content: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              TextFormField(
-                controller: nameController,
-                decoration: const InputDecoration(labelText: "Name"),
-              ),
-              const SizedBox(height: 10),
-              TextFormField(
-                controller: phoneController,
-                decoration: const InputDecoration(labelText: "Phone"),
-              ),
-            ],
+        return Dialog(
+          shape:
+              RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+          elevation: 4,
+          child: Padding(
+            padding: const EdgeInsets.all(20.0),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text(
+                  'Edit Profile',
+                  style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+                ),
+                const SizedBox(height: 16),
+                TextFormField(
+                  controller: usernameController,
+                  decoration: InputDecoration(
+                    labelText: 'Username',
+                    prefixIcon: const Icon(Icons.person),
+                    border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(12)),
+                    filled: true,
+                    fillColor: Colors.grey[100],
+                  ),
+                ),
+                const SizedBox(height: 12),
+                TextFormField(
+                  controller: phoneController,
+                  decoration: InputDecoration(
+                    labelText: 'Phone Number',
+                    prefixIcon: const Icon(Icons.phone),
+                    border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(12)),
+                    filled: true,
+                    fillColor: Colors.grey[100],
+                  ),
+                  keyboardType: TextInputType.phone,
+                ),
+                const SizedBox(height: 20),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.end,
+                  children: [
+                    TextButton(
+                      onPressed: () => Navigator.pop(context),
+                      child: const Text('Cancel',
+                          style: TextStyle(color: Colors.grey)),
+                    ),
+                    const SizedBox(width: 8),
+                    ElevatedButton(
+                      onPressed: _updateUserData,
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: Theme.of(context).primaryColor,
+                        foregroundColor: Colors.white,
+                        shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(12)),
+                      ),
+                      child: const Text('Save'),
+                    ),
+                  ],
+                ),
+              ],
+            ),
           ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(context),
-              child: const Text("Cancel"),
-            ),
-            ElevatedButton(
-              onPressed: _updateUserData,
-              child: const Text("Save"),
-            ),
-          ],
         );
       },
     );
@@ -3649,33 +3847,71 @@ class _ProfilePageState extends State<ProfilePage> {
     showDialog(
       context: context,
       builder: (context) {
-        return AlertDialog(
-          title: const Text("Reset Password"),
-          content: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              TextFormField(
-                controller: otpController,
-                decoration: const InputDecoration(labelText: "Enter OTP"),
-              ),
-              const SizedBox(height: 10),
-              TextFormField(
-                controller: newPasswordController,
-                decoration: const InputDecoration(labelText: "New Password"),
-                obscureText: true,
-              ),
-            ],
+        return Dialog(
+          shape:
+              RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+          elevation: 4,
+          child: Padding(
+            padding: const EdgeInsets.all(20.0),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text(
+                  'Reset Password',
+                  style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+                ),
+                const SizedBox(height: 16),
+                TextFormField(
+                  controller: otpController,
+                  decoration: InputDecoration(
+                    labelText: 'Enter OTP',
+                    prefixIcon: const Icon(Icons.mail),
+                    border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(12)),
+                    filled: true,
+                    fillColor: Colors.grey[100],
+                  ),
+                  keyboardType: TextInputType.number,
+                ),
+                const SizedBox(height: 12),
+                TextFormField(
+                  controller: newPasswordController,
+                  decoration: InputDecoration(
+                    labelText: 'New Password',
+                    prefixIcon: const Icon(Icons.lock),
+                    border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(12)),
+                    filled: true,
+                    fillColor: Colors.grey[100],
+                  ),
+                  obscureText: true,
+                ),
+                const SizedBox(height: 20),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.end,
+                  children: [
+                    TextButton(
+                      onPressed: () => Navigator.pop(context),
+                      child: const Text('Cancel',
+                          style: TextStyle(color: Colors.grey)),
+                    ),
+                    const SizedBox(width: 8),
+                    ElevatedButton(
+                      onPressed: _resetPassword,
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: Theme.of(context).primaryColor,
+                        foregroundColor: Colors.white,
+                        shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(12)),
+                      ),
+                      child: const Text('Reset'),
+                    ),
+                  ],
+                ),
+              ],
+            ),
           ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(context),
-              child: const Text("Cancel"),
-            ),
-            ElevatedButton(
-              onPressed: _resetPassword,
-              child: const Text("Reset"),
-            ),
-          ],
         );
       },
     );
@@ -4036,7 +4272,7 @@ import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
 import '../utils/network_config.dart';
-import '/hod_screens/hod_dashboard.dart';
+import '../hod_screens/hod.dart';
 
 class DepartmentStaffPage extends StatefulWidget {
   const DepartmentStaffPage({super.key});
@@ -4486,8 +4722,8 @@ import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
 import '../utils/network_config.dart';
-import '../staff_screens/staff_dashboard.dart';
-import '../hod_screens/hod_dashboard.dart';
+import '../staff_screens/staff.dart';
+import '../hod_screens/hod.dart';
 
 class DepartmentUsersPage extends StatefulWidget {
   final bool isStaffView; // Controls edit/delete visibility
@@ -4972,7 +5208,7 @@ class _DepartmentUsersPageState extends State<DepartmentUsersPage> {
 
 ============================
 
-frontend/lib/staff_screens/staff_dashboard.dart:
+frontend/lib/staff_screens/staff.dart:
 
 contents:
 import 'package:flutter/material.dart';
@@ -5064,6 +5300,177 @@ class _StaffDashboardState extends State<StaffDashboard> {
         ),
       ),
     );
+  }
+}
+
+============================
+
+frontend/lib/staff_screens/staff_academics_page.dart:
+
+contents:
+import 'package:flutter/material.dart';
+
+class StaffAcademicsPage extends StatelessWidget {
+  const StaffAcademicsPage({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    return const Center(
+      child: Text(
+        'Staff Academics Page\n(Under Development)',
+        style: TextStyle(fontSize: 24, color: Colors.blueAccent),
+        textAlign: TextAlign.center,
+      ),
+    );
+  }
+}
+
+============================
+
+frontend/lib/staff_screens/staff_announcements_page.dart:
+
+contents:
+import 'package:flutter/material.dart';
+
+class StaffAnnouncementsPage extends StatelessWidget {
+  const StaffAnnouncementsPage({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    return const Center(
+      child: Text(
+        'Staff Announcements Page\n(Under Development)',
+        style: TextStyle(fontSize: 24, color: Colors.blueAccent),
+        textAlign: TextAlign.center,
+      ),
+    );
+  }
+}
+
+============================
+
+frontend/lib/staff_screens/staff_dashboard_page.dart:
+
+contents:
+import 'package:flutter/material.dart';
+
+class StaffDashboardPage extends StatelessWidget {
+  const StaffDashboardPage({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.all(16.0),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          const Text(
+            "Welcome, Staff!",
+            style: TextStyle(
+                fontSize: 24,
+                fontWeight: FontWeight.bold,
+                color: Colors.blueAccent),
+            textAlign: TextAlign.center,
+          ),
+          const SizedBox(height: 20),
+          ElevatedButton.icon(
+            onPressed: () {
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(content: Text("Timetable feature coming soon!")),
+              );
+            },
+            icon: const Icon(Icons.schedule),
+            label: const Text("View Timetable"),
+            style: ElevatedButton.styleFrom(
+              padding: const EdgeInsets.symmetric(vertical: 12),
+              shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12)),
+            ),
+          ),
+          const SizedBox(height: 16),
+          ElevatedButton.icon(
+            onPressed: () {
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(
+                    content: Text("Assignments feature coming soon!")),
+              );
+            },
+            icon: const Icon(Icons.assignment),
+            label: const Text("Manage Assignments"),
+            style: ElevatedButton.styleFrom(
+              padding: const EdgeInsets.symmetric(vertical: 12),
+              shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12)),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+============================
+
+frontend/lib/staff_screens/staff_settings_page.dart:
+
+contents:
+import 'package:flutter/material.dart';
+
+class StaffSettingsPage extends StatelessWidget {
+  const StaffSettingsPage({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.all(16.0),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          const Text(
+            'Settings',
+            style: TextStyle(
+              fontSize: 24,
+              fontWeight: FontWeight.bold,
+              color: Colors.blueAccent,
+            ),
+            textAlign: TextAlign.center,
+          ),
+          const SizedBox(height: 20),
+          ElevatedButton.icon(
+            onPressed: () {
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(
+                    content: Text("Profile management coming soon!")),
+              );
+            },
+            icon: const Icon(Icons.person),
+            label: const Text("Manage Profile"),
+            style: ElevatedButton.styleFrom(
+              padding: const EdgeInsets.symmetric(vertical: 12),
+              shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12)),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+============================
+
+frontend/lib/staff_screens/staff_students_page.dart:
+
+contents:
+import 'package:flutter/material.dart';
+import '../../shared/department_users_page.dart';
+
+class StaffStudentsPage extends StatelessWidget {
+  const StaffStudentsPage({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    return const DepartmentUsersPage(isStaffView: true);
   }
 }
 

@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import 'admin_dashboard.dart'; // ✅ Import Admin Dashboard
+import '../admin_screens/admin_dashboard.dart'; // ✅ Import Admin Dashboard
 
 class SplashScreen extends StatefulWidget {
   const SplashScreen({super.key});

@@ -3,7 +3,7 @@ from flask import Flask, jsonify, request
 from flask_cors import CORS
 from flask_jwt_extended import JWTManager, create_access_token, create_refresh_token, jwt_required, get_jwt_identity
 from config import Config
-from database import db
+from database import db , migrate
 from routes.auth import auth_bp
 from routes.admin import admin
 from routes.profile import profile_bp
@@ -26,8 +26,8 @@ def create_app():
 
     # Initialize extensions
     db.init_app(app)
+    migrate.init_app(app, db)  # Initialize Migrate with app and db
     jwt = JWTManager(app)
-
     # Set up logging
     logging.basicConfig(level=logging.INFO)
     logger = logging.getLogger(__name__)

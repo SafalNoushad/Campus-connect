@@ -29,7 +29,7 @@ class HomeScreenState extends State<HomeScreen> {
     _widgetOptions = [
       HomeContent(userData: widget.userData),
       const ChatbotPage(),
-      const AcademicsPage(),
+      const StudentAcademicsPage(),
       const AnnouncementsPage(),
       const ProfilePage(),
     ];

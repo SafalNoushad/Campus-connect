@@ -4,7 +4,7 @@ import 'package:http/http.dart' as http;
 import 'dart:convert';
 import '../utils/network_config.dart';
 import 'home.dart';
-import 'admin_dashboard.dart';
+import '../admin_screens/admin_dashboard.dart';
 import '../staff_screens/staff_dashboard.dart';
 import '../hod_screens/hod_dashboard.dart';
 

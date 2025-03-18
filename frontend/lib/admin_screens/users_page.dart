@@ -2,7 +2,7 @@ import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
-import '../screens/admin_dashboard.dart'; // Replace with your actual admin dashboard path
+import 'admin_dashboard.dart'; // Replace with your actual admin dashboard path
 import '../utils/network_config.dart'; // Replace with your actual network config path
 
 class UsersPage extends StatefulWidget {

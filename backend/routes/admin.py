@@ -1,7 +1,7 @@
 from flask import Blueprint, jsonify, request
 from flask_jwt_extended import jwt_required, get_jwt
 from database import db
-from models import User
+from models import User, Subject
 from functools import wraps
 import bcrypt
 import re
@@ -18,6 +18,7 @@ def admin_required(fn):
         return fn(*args, **kwargs)
     return wrapper
 
+# User Management Endpoints (unchanged)
 @admin.route('/users', methods=['GET'])
 @admin_required
 def get_users():
@@ -34,26 +35,22 @@ def register_user():
         data = request.json
         admission_number = data.get('admission_number')
         username = data.get('username')
-        email = data.get('email')  # Accept email from request instead of generating
-        password = data.get('password')  # Accept password from request
+        email = data.get('email')
+        password = data.get('password')
         role = data.get('role')
         departmentcode = data.get('departmentcode')
         batch = data.get('batch') if role == 'student' else None
         phone_number = data.get('phone_number')
 
-        # Validate required fields
         if not all([admission_number, username, email, password, role, departmentcode]):
             return jsonify({'error': 'Missing required fields'}), 400
 
-        # Validate role
         if role not in ['admin', 'hod', 'staff', 'student']:
             return jsonify({'error': 'Invalid role value'}), 400
 
-        # Basic email validation
         if not re.match(r"[^@]+@[^@]+\.[^@]+", email):
             return jsonify({'error': 'Invalid email format'}), 400
 
-        # Check for existing user
         existing_user = User.query.filter(
             (User.admission_number == admission_number) | (User.email == email)
         ).first()
@@ -63,7 +60,6 @@ def register_user():
             if existing_user.email == email:
                 return jsonify({"error": "Email already exists"}), 409
 
-        # Hash the provided password
         hashed_password = bcrypt.hashpw(password.encode('utf-8'), bcrypt.gensalt()).decode('utf-8')
 
         new_user = User(
@@ -97,17 +93,14 @@ def update_user(admission_number):
         role = data.get('role')
         batch = data.get('batch') if data.get('role') == 'student' else None
         departmentcode = data.get('departmentcode')
-        phone_number = data.get('phone_number')  # Added phone_number
+        phone_number = data.get('phone_number')
 
-        # Validate required fields
         if not all([username, email, role, departmentcode]):
             return jsonify({'error': 'Missing required fields'}), 400
 
-        # Validate role
         if role not in ['admin', 'hod', 'staff', 'student']:
             return jsonify({'error': 'Invalid role value'}), 400
 
-        # Basic email validation
         if not re.match(r"[^@]+@[^@]+\.[^@]+", email):
             return jsonify({'error': 'Invalid email format'}), 400
 
@@ -115,7 +108,6 @@ def update_user(admission_number):
         if not user:
             return jsonify({'error': 'User not found'}), 404
 
-        # Check for email conflict with other users
         existing_user = User.query.filter(
             (User.email == email) & (User.admission_number != admission_number)
         ).first()
@@ -127,7 +119,7 @@ def update_user(admission_number):
         user.role = role
         user.batch = batch
         user.departmentcode = departmentcode
-        user.phone_number = phone_number  # Update phone_number
+        user.phone_number = phone_number
         db.session.commit()
 
         return jsonify({
@@ -155,3 +147,86 @@ def delete_user(admission_number):
     except Exception as e:
         db.session.rollback()
         return jsonify({'error': 'Failed to delete user', 'details': str(e)}), 500
+
+# Subject Management Endpoints
+@admin.route('/subjects', methods=['GET'])
+@admin_required
+def get_all_subjects():
+    """Fetch all subjects across all departments."""
+    try:
+        subjects = Subject.query.all()
+        return jsonify([subject.to_dict() for subject in subjects]), 200
+    except Exception as e:
+        return jsonify({'error': 'Failed to fetch subjects', 'details': str(e)}), 500
+
+@admin.route('/subjects', methods=['POST'])
+@admin_required
+def add_subject():
+    """Add a new subject."""
+    try:
+        data = request.get_json()
+        semester = data.get('semester')
+        subject_code = data.get('subject_code')
+        subject_name = data.get('subject_name')
+        credits = data.get('credits')
+        departmentcode = data.get('departmentcode')
+
+        if not all([semester, subject_code, subject_name, credits, departmentcode]):
+            return jsonify({'error': 'Missing required fields'}), 400
+
+        if semester not in [f'S{i}' for i in range(1, 9)]:
+            return jsonify({'error': 'Invalid semester (must be S1 to S8)'}), 400
+
+        credits = int(credits)
+        if credits <= 0:
+            return jsonify({'error': 'Credits must be positive'}), 400
+
+        if Subject.query.filter_by(subject_code=subject_code).first():
+            return jsonify({'error': 'Subject code already exists'}), 409
+
+        new_subject = Subject(
+            subject_code=subject_code,
+            semester=semester,
+            subject_name=subject_name,
+            credits=credits,
+            departmentcode=departmentcode
+        )
+        db.session.add(new_subject)
+        db.session.commit()
+
+        return jsonify({'message': 'Subject added successfully', 'subject': new_subject.to_dict()}), 201
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'error': 'Failed to add subject', 'details': str(e)}), 500
+
+@admin.route('/subjects/<string:subject_code>', methods=['PUT'])
+@admin_required
+def edit_subject(subject_code):
+    """Edit an existing subject."""
+    try:
+        data = request.get_json()
+        subject = Subject.query.get_or_404(subject_code)
+
+        subject.semester = data.get('semester', subject.semester)
+        subject.subject_name = data.get('subject_name', subject.subject_name)
+        subject.credits = data.get('credits', subject.credits)
+        subject.departmentcode = data.get('departmentcode', subject.departmentcode)
+
+        db.session.commit()
+        return jsonify({'message': 'Subject updated successfully', 'subject': subject.to_dict()}), 200
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'error': 'Failed to update subject', 'details': str(e)}), 500
+
+@admin.route('/subjects/<string:subject_code>', methods=['DELETE'])
+@admin_required
+def delete_subject(subject_code):
+    """Delete a subject."""
+    try:
+        subject = Subject.query.get_or_404(subject_code)
+        db.session.delete(subject)
+        db.session.commit()
+        return jsonify({'message': 'Subject deleted successfully'}), 200
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'error': 'Failed to delete subject', 'details': str(e)}), 500
