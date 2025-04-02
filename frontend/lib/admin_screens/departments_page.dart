@@ -33,11 +33,12 @@ class _DepartmentPageState extends State<DepartmentPage> {
       }
 
       final response = await http.get(
-        Uri.parse('${NetworkConfig.getBaseUrl()}/api/departments/departments'),
+        Uri.parse(
+            '${NetworkConfig.getBaseUrl()}/api/admin/departments'), // Updated endpoint
         headers: {'Authorization': 'Bearer $token'},
       );
 
-      print(
+      debugPrint(
           'Fetch Departments Response: ${response.statusCode} - ${response.body}');
 
       if (response.statusCode == 200) {
@@ -85,7 +86,7 @@ class _DepartmentPageState extends State<DepartmentPage> {
       }
 
       final url = Uri.parse(
-          '${NetworkConfig.getBaseUrl()}/api/departments/departments');
+          '${NetworkConfig.getBaseUrl()}/api/admin/departments'); // Updated endpoint
       print('Adding department at: $url with code: $code, name: $name');
       final response = await http.post(
         url,
@@ -139,7 +140,7 @@ class _DepartmentPageState extends State<DepartmentPage> {
       setState(() {
         _errorMessage = errorMsg;
       });
-      print('Add exception: $e');
+      debugPrint('Add exception: $e');
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text(errorMsg)),
@@ -171,7 +172,7 @@ class _DepartmentPageState extends State<DepartmentPage> {
       }
 
       final url = Uri.parse(
-          '${NetworkConfig.getBaseUrl()}/api/departments/departments/$departmentcode');
+          '${NetworkConfig.getBaseUrl()}/api/admin/departments/$departmentcode'); // Updated endpoint
       print(
           'Updating department at: $url with original code: $departmentcode, new code: $code, name: $name');
       final response = await http.put(
@@ -260,7 +261,7 @@ class _DepartmentPageState extends State<DepartmentPage> {
       }
 
       final url = Uri.parse(
-          '${NetworkConfig.getBaseUrl()}/api/departments/departments/$departmentcode');
+          '${NetworkConfig.getBaseUrl()}/api/admin/departments/$departmentcode'); // Updated endpoint
       print('Deleting department at: $url with code: $departmentcode');
       final response = await http.delete(
         url,
@@ -429,7 +430,7 @@ class _DepartmentPageState extends State<DepartmentPage> {
                 ],
               ),
               content: SizedBox(
-                width: 300, // Wider dialog for better usability
+                width: 300,
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
                   children: [
@@ -486,10 +487,8 @@ class _DepartmentPageState extends State<DepartmentPage> {
               actions: [
                 TextButton(
                   onPressed: () => Navigator.pop(context),
-                  child: const Text(
-                    'Cancel',
-                    style: TextStyle(color: Colors.grey),
-                  ),
+                  child: const Text('Cancel',
+                      style: TextStyle(color: Colors.grey)),
                 ),
                 ElevatedButton(
                   onPressed: (codeError == null &&
@@ -501,7 +500,7 @@ class _DepartmentPageState extends State<DepartmentPage> {
                           addDepartment(codeController.text.trim(),
                               nameController.text.trim());
                         }
-                      : null, // Disabled if validation fails
+                      : null,
                   style: ElevatedButton.styleFrom(
                     backgroundColor: const Color(0xFF0C6170),
                     foregroundColor: Colors.white,
@@ -558,11 +557,8 @@ class _DepartmentPageState extends State<DepartmentPage> {
             ElevatedButton(
               onPressed: () {
                 Navigator.pop(context);
-                updateDepartment(
-                  currentCode,
-                  codeController.text.trim(),
-                  nameController.text.trim(),
-                );
+                updateDepartment(currentCode, codeController.text.trim(),
+                    nameController.text.trim());
               },
               child: const Text('Update'),
             ),

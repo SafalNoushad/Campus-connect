@@ -1,7 +1,78 @@
 import 'package:flutter/material.dart';
+import 'package:http/http.dart' as http;
+import 'package:shared_preferences/shared_preferences.dart';
+import 'dart:convert';
+import '../utils/network_config.dart';
 
-class AdminHomePage extends StatelessWidget {
+class AdminHomePage extends StatefulWidget {
   const AdminHomePage({super.key});
+
+  @override
+  _AdminHomePageState createState() => _AdminHomePageState();
+}
+
+class _AdminHomePageState extends State<AdminHomePage> {
+  int _userCount = 0;
+  int _departmentCount = 0;
+  bool _isLoading = true;
+  String? _errorMessage;
+
+  @override
+  void initState() {
+    super.initState();
+    fetchCounts();
+  }
+
+  Future<void> fetchCounts() async {
+    setState(() => _isLoading = true);
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final token = prefs.getString('jwt_token');
+      if (token == null) {
+        _redirectToLogin();
+        return;
+      }
+
+      // Fetch users count
+      final usersResponse = await http.get(
+        Uri.parse('${NetworkConfig.getBaseUrl()}/api/admin/users'),
+        headers: {'Authorization': 'Bearer $token'},
+      );
+
+      // Fetch departments count
+      final departmentsResponse = await http.get(
+        Uri.parse('${NetworkConfig.getBaseUrl()}/api/admin/departments'),
+        headers: {'Authorization': 'Bearer $token'},
+      );
+
+      if (usersResponse.statusCode == 200 &&
+          departmentsResponse.statusCode == 200) {
+        final usersData = jsonDecode(usersResponse.body) as List<dynamic>;
+        final departmentsData =
+            jsonDecode(departmentsResponse.body) as List<dynamic>;
+        setState(() {
+          _userCount = usersData.length;
+          _departmentCount = departmentsData.length;
+          _errorMessage = null;
+        });
+      } else {
+        setState(() {
+          _errorMessage =
+              'Failed to load data: Users(${usersResponse.statusCode}), Departments(${departmentsResponse.statusCode})';
+        });
+      }
+    } catch (e) {
+      setState(() {
+        _errorMessage = 'Error fetching data: $e';
+      });
+    } finally {
+      setState(() => _isLoading = false);
+    }
+  }
+
+  void _redirectToLogin() {
+    Navigator.pushReplacementNamed(context, '/login');
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -36,13 +107,21 @@ class AdminHomePage extends StatelessWidget {
                     style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
                   ),
                   const SizedBox(height: 10),
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceAround,
-                    children: [
-                      _buildStatItem("Users", "50"),
-                      _buildStatItem("Departments", "5"),
-                    ],
-                  ),
+                  _isLoading
+                      ? const Center(child: CircularProgressIndicator())
+                      : _errorMessage != null
+                          ? Text(
+                              _errorMessage!,
+                              style: const TextStyle(color: Colors.red),
+                            )
+                          : Row(
+                              mainAxisAlignment: MainAxisAlignment.spaceAround,
+                              children: [
+                                _buildStatItem("Users", _userCount.toString()),
+                                _buildStatItem(
+                                    "Departments", _departmentCount.toString()),
+                              ],
+                            ),
                 ],
               ),
             ),
@@ -55,9 +134,14 @@ class AdminHomePage extends StatelessWidget {
   Widget _buildStatItem(String title, String value) {
     return Column(
       children: [
-        Text(value,
-            style: const TextStyle(fontSize: 24, fontWeight: FontWeight.bold)),
-        Text(title, style: const TextStyle(fontSize: 16, color: Colors.grey)),
+        Text(
+          value,
+          style: const TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
+        ),
+        Text(
+          title,
+          style: const TextStyle(fontSize: 16, color: Colors.grey),
+        ),
       ],
     );
   }

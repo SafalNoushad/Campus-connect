@@ -62,9 +62,9 @@ class _HodDashboardState extends State<HodDashboard> {
     _pages = [
       HodHome(username: username ?? 'HOD'), // Pass username to HodHome
       const AcademicsPage(),
-      const AnnouncementsPage(),
+      const HodAnnouncementsPage(),
       const DepartmentUsersPage(isStaffView: false),
-      const SettingsPage(),
+      const HodSettingsPage(),
     ];
 
     return Scaffold(

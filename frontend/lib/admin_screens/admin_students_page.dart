@@ -8,10 +8,10 @@ class AdminStudentsPage extends StatefulWidget {
   const AdminStudentsPage({super.key});
 
   @override
-  _AdminStudentsPageState createState() => _AdminStudentsPageState();
+  AdminStudentsPageState createState() => AdminStudentsPageState();
 }
 
-class _AdminStudentsPageState extends State<AdminStudentsPage> {
+class AdminStudentsPageState extends State<AdminStudentsPage> {
   List<dynamic> _students = [];
   dynamic _searchedStudent;
   String _searchQuery = '';

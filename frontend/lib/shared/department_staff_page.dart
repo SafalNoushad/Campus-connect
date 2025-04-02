@@ -14,14 +14,14 @@ class DepartmentStaffPage extends StatefulWidget {
 
 class _DepartmentStaffPageState extends State<DepartmentStaffPage> {
   List<Map<String, dynamic>> _staff = [];
-  List<Map<String, dynamic>> _departments = [];
+  String? _departmentCode; // HOD's department from JWT
   String? _errorMessage;
 
   @override
   void initState() {
     super.initState();
     fetchStaff();
-    fetchDepartments();
+    fetchUserDepartment(); // Get HOD's department
   }
 
   Future<void> fetchStaff() async {
@@ -34,7 +34,7 @@ class _DepartmentStaffPageState extends State<DepartmentStaffPage> {
       }
 
       final response = await http.get(
-        Uri.parse('${NetworkConfig.getBaseUrl()}/api/hod/department/staff'),
+        Uri.parse('${NetworkConfig.getBaseUrl()}/api/hod/staff/list'),
         headers: {'Authorization': 'Bearer $token'},
       );
 
@@ -55,7 +55,7 @@ class _DepartmentStaffPageState extends State<DepartmentStaffPage> {
     }
   }
 
-  Future<void> fetchDepartments() async {
+  Future<void> fetchUserDepartment() async {
     try {
       final prefs = await SharedPreferences.getInstance();
       final token = prefs.getString('jwt_token');
@@ -64,24 +64,16 @@ class _DepartmentStaffPageState extends State<DepartmentStaffPage> {
         return;
       }
 
-      final response = await http.get(
-        Uri.parse('${NetworkConfig.getBaseUrl()}/api/departments/departments'),
-        headers: {'Authorization': 'Bearer $token'},
-      );
-
-      if (response.statusCode == 200) {
-        setState(() {
-          _departments =
-              List<Map<String, dynamic>>.from(jsonDecode(response.body));
-        });
-      } else {
-        setState(() {
-          _errorMessage = 'Failed to load departments: ${response.statusCode}';
-        });
-      }
+      // Decode JWT to get departmentcode (assuming it's in the token)
+      final parts = token.split('.');
+      final payload = jsonDecode(
+          utf8.decode(base64Url.decode(base64Url.normalize(parts[1]))));
+      setState(() {
+        _departmentCode = payload['departmentcode'];
+      });
     } catch (e) {
       setState(() {
-        _errorMessage = 'Error fetching departments: $e';
+        _errorMessage = 'Error fetching department: $e';
       });
     }
   }
@@ -169,8 +161,7 @@ class _DepartmentStaffPageState extends State<DepartmentStaffPage> {
         TextEditingController(text: staff['email']);
     TextEditingController phoneController =
         TextEditingController(text: staff['phone_number'] ?? '');
-    String role = 'staff'; // Fixed to staff since this page is for staff only
-    String? departmentcode = staff['departmentcode'];
+    String role = 'staff';
 
     showDialog(
       context: context,
@@ -179,156 +170,120 @@ class _DepartmentStaffPageState extends State<DepartmentStaffPage> {
           shape:
               RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
           elevation: 4,
-          child: StatefulBuilder(
-            builder: (dialogContext, setDialogState) {
-              return Container(
-                padding: const EdgeInsets.all(20),
-                width: MediaQuery.of(context).size.width * 0.9,
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  crossAxisAlignment: CrossAxisAlignment.start,
+          child: Container(
+            padding: const EdgeInsets.all(20),
+            width: MediaQuery.of(context).size.width * 0.9,
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        const Text("Edit Staff",
-                            style: TextStyle(
-                                fontSize: 20, fontWeight: FontWeight.bold)),
-                        IconButton(
-                          icon: const Icon(Icons.close, color: Colors.grey),
-                          onPressed: () => Navigator.pop(dialogContext),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 16),
-                    TextField(
-                      controller: usernameController,
-                      decoration: InputDecoration(
-                        labelText: "Username",
-                        prefixIcon: const Icon(Icons.person_outline),
-                        border: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(12)),
-                        filled: true,
-                        fillColor: Colors.grey[100],
-                      ),
-                    ),
-                    const SizedBox(height: 12),
-                    TextField(
-                      controller: emailController,
-                      decoration: InputDecoration(
-                        labelText: "Email",
-                        prefixIcon: const Icon(Icons.email_outlined),
-                        border: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(12)),
-                        filled: true,
-                        fillColor: Colors.grey[100],
-                      ),
-                    ),
-                    const SizedBox(height: 12),
-                    TextField(
-                      controller: phoneController,
-                      decoration: InputDecoration(
-                        labelText: "Phone Number (Optional)",
-                        prefixIcon: const Icon(Icons.phone_outlined),
-                        border: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(12)),
-                        filled: true,
-                        fillColor: Colors.grey[100],
-                      ),
-                    ),
-                    const SizedBox(height: 12),
-                    _departments.isEmpty
-                        ? const Text("Loading departments...",
-                            style: TextStyle(color: Colors.grey))
-                        : DropdownButtonFormField<String>(
-                            value: departmentcode,
-                            items: _departments.map((dept) {
-                              return DropdownMenuItem<String>(
-                                value: dept['departmentcode'],
-                                child: Text(dept['departmentname']),
-                              );
-                            }).toList(),
-                            onChanged: (value) {
-                              setDialogState(() {
-                                departmentcode = value;
-                              });
-                            },
-                            decoration: InputDecoration(
-                              labelText: "Department",
-                              prefixIcon: const Icon(Icons.domain),
-                              border: OutlineInputBorder(
-                                  borderRadius: BorderRadius.circular(12)),
-                              filled: true,
-                              fillColor: Colors.grey[100],
-                            ),
-                          ),
-                    const SizedBox(height: 20),
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.end,
-                      children: [
-                        TextButton(
-                          onPressed: () => Navigator.pop(dialogContext),
-                          style: TextButton.styleFrom(
-                            foregroundColor: Colors.grey,
-                            padding: const EdgeInsets.symmetric(
-                                horizontal: 16, vertical: 8),
-                          ),
-                          child: const Text("Cancel"),
-                        ),
-                        const SizedBox(width: 8),
-                        ElevatedButton(
-                          onPressed: () async {
-                            if (usernameController.text.isEmpty ||
-                                emailController.text.isEmpty ||
-                                departmentcode == null) {
-                              ScaffoldMessenger.of(context).showSnackBar(
-                                const SnackBar(
-                                    content: Text(
-                                        "Please fill all required fields")),
-                              );
-                              return;
-                            }
-                            await updateStaff(staff['admission_number'], {
-                              'username': usernameController.text,
-                              'email': emailController.text,
-                              'phone_number': phoneController.text.isEmpty
-                                  ? null
-                                  : phoneController.text,
-                              'role': role,
-                              'batch': null, // No batch for staff
-                              'departmentcode': departmentcode,
-                            });
-                            Navigator.pop(dialogContext);
-                          },
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: Theme.of(context).primaryColor,
-                            padding: const EdgeInsets.symmetric(
-                                horizontal: 16, vertical: 8),
-                            shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(12)),
-                          ),
-                          child: const Text("Save",
-                              style: TextStyle(color: Colors.white)),
-                        ),
-                      ],
+                    const Text("Edit Staff",
+                        style: TextStyle(
+                            fontSize: 20, fontWeight: FontWeight.bold)),
+                    IconButton(
+                      icon: const Icon(Icons.close, color: Colors.grey),
+                      onPressed: () => Navigator.pop(dialogContext),
                     ),
                   ],
                 ),
-              );
-            },
+                const SizedBox(height: 16),
+                TextField(
+                  controller: usernameController,
+                  decoration: InputDecoration(
+                    labelText: "Username",
+                    prefixIcon: const Icon(Icons.person_outline),
+                    border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(12)),
+                    filled: true,
+                    fillColor: Colors.grey[100],
+                  ),
+                ),
+                const SizedBox(height: 12),
+                TextField(
+                  controller: emailController,
+                  decoration: InputDecoration(
+                    labelText: "Email",
+                    prefixIcon: const Icon(Icons.email_outlined),
+                    border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(12)),
+                    filled: true,
+                    fillColor: Colors.grey[100],
+                  ),
+                ),
+                const SizedBox(height: 12),
+                TextField(
+                  controller: phoneController,
+                  decoration: InputDecoration(
+                    labelText: "Phone Number (Optional)",
+                    prefixIcon: const Icon(Icons.phone_outlined),
+                    border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(12)),
+                    filled: true,
+                    fillColor: Colors.grey[100],
+                  ),
+                ),
+                const SizedBox(height: 20),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.end,
+                  children: [
+                    TextButton(
+                      onPressed: () => Navigator.pop(dialogContext),
+                      style: TextButton.styleFrom(
+                        foregroundColor: Colors.grey,
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 16, vertical: 8),
+                      ),
+                      child: const Text("Cancel"),
+                    ),
+                    const SizedBox(width: 8),
+                    ElevatedButton(
+                      onPressed: () async {
+                        if (usernameController.text.isEmpty ||
+                            emailController.text.isEmpty) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(
+                                content:
+                                    Text("Please fill all required fields")),
+                          );
+                          return;
+                        }
+                        await updateStaff(staff['admission_number'], {
+                          'username': usernameController.text,
+                          'email': emailController.text,
+                          'phone_number': phoneController.text.isEmpty
+                              ? null
+                              : phoneController.text,
+                          'role': role,
+                          'departmentcode':
+                              _departmentCode, // Use HOD's department
+                        });
+                        Navigator.pop(dialogContext);
+                      },
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: Theme.of(context).primaryColor,
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 16, vertical: 8),
+                        shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(12)),
+                      ),
+                      child: const Text("Save",
+                          style: TextStyle(color: Colors.white)),
+                    ),
+                  ],
+                ),
+              ],
+            ),
           ),
         );
       },
     );
   }
 
-  Color _getRoleColor(String role) {
-    return Colors.green; // Fixed to green for staff
-  }
-
-  IconData _getRoleIcon(String role) {
-    return Icons.person; // Fixed to person icon for staff
-  }
+  Color _getRoleColor(String role) => Colors.green;
+  IconData _getRoleIcon(String role) => Icons.person;
 
   @override
   Widget build(BuildContext context) {
@@ -413,24 +368,6 @@ class _DepartmentStaffPageState extends State<DepartmentStaffPage> {
                                     ),
                                   ],
                                 ),
-                              ),
-                              Row(
-                                mainAxisSize: MainAxisSize.min,
-                                children: [
-                                  IconButton(
-                                    icon: const Icon(Icons.edit,
-                                        color: Colors.blue),
-                                    onPressed: () => showEditDialog(staff),
-                                    tooltip: 'Edit Staff',
-                                  ),
-                                  IconButton(
-                                    icon: const Icon(Icons.delete,
-                                        color: Colors.red),
-                                    onPressed: () =>
-                                        deleteStaff(staff['admission_number']),
-                                    tooltip: 'Delete Staff',
-                                  ),
-                                ],
                               ),
                             ],
                           ),

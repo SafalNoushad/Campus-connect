@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../shared/department_staff_page.dart';
 import '../shared/department_users_page.dart';
+import 'request_page.dart'; // Import the new RequestsPage
 
 class HodHome extends StatelessWidget {
   final String username; // Required username parameter
@@ -62,12 +63,15 @@ class HodHome extends StatelessWidget {
           const SizedBox(height: 16),
           ElevatedButton.icon(
             onPressed: () {
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(content: Text("HOD feature coming soon!")),
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (context) => const RequestsPage(),
+                ),
               );
             },
             icon: const Icon(Icons.check_circle),
-            label: const Text("Approve Requests"),
+            label: const Text("Requests"),
             style: ElevatedButton.styleFrom(
               padding: const EdgeInsets.symmetric(vertical: 12),
               shape: RoundedRectangleBorder(
