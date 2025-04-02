@@ -273,10 +273,6 @@ class HomeContentState extends State<HomeContent> {
         } else if (data is Map<String, dynamic> &&
             data.containsKey('assignments')) {
           assignmentList = data['assignments'];
-          if (assignmentList is! List) {
-            throw Exception(
-                'Expected "assignments" to be a list, but received: $assignmentList');
-          }
         } else {
           throw Exception(
               'Expected a list of assignments or an "assignments" key, but received: $data');

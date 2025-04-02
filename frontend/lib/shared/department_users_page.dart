@@ -73,7 +73,7 @@ class _DepartmentUsersPageState extends State<DepartmentUsersPage> {
       }
 
       // Decode JWT to get departmentcode
-      final parts = token!.split('.');
+      final parts = token.split('.');
       final payload = jsonDecode(
           utf8.decode(base64Url.decode(base64Url.normalize(parts[1]))));
       setState(() {
