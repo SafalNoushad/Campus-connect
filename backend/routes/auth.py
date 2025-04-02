@@ -1,28 +1,26 @@
-from flask import Flask, Blueprint, request, jsonify
-from flask_jwt_extended import create_access_token, JWTManager
+from flask import Blueprint, request, jsonify
+from flask_jwt_extended import create_access_token, jwt_required, get_jwt_identity
+from database import db
+from models import User
 import os
 from dotenv import load_dotenv
 import bcrypt
-from flask_cors import CORS
-from database import db
-from models import User
 import secrets
 import smtplib
 from email.mime.text import MIMEText
 from datetime import datetime, timedelta
+import logging
 
 load_dotenv()
 
-app = Flask(__name__)
-CORS(app)
-
-app.config["JWT_SECRET_KEY"] = os.getenv("SECRET_KEY")
-jwt = JWTManager(app)
+# Configure logging
+logging.basicConfig(level=logging.DEBUG)
+logger = logging.getLogger(__name__)
 
 auth_bp = Blueprint('auth', __name__)
 
-# Temporary in-memory storage for OTPs (use a database or Redis in production)
-otp_store = {}  # Format: {admission_number: {"otp": "123456", "expires": datetime}}
+# Temporary OTP storage (use Redis/DB in production)
+otp_store = {}  # {admission_number: {"otp": "123456", "expires": datetime}}
 
 @auth_bp.route('/login', methods=['POST'])
 def login():
@@ -31,32 +29,36 @@ def login():
         admission_number = data.get("admission_number")
         password = data.get("password")
 
+        logger.debug(f"Login attempt for admission_number: {admission_number}")
+
         if not admission_number or not password:
+            logger.warning("Missing admission number or password")
             return jsonify({"error": "Missing admission number or password"}), 400
 
         user = User.query.filter_by(admission_number=admission_number).first()
-        if not user:
-            return jsonify({"error": "Invalid admission number or password"}), 401
-        
-        if user.role == 'admin' and user.password is None:
-            return jsonify({"error": "Admin must set a password via profile"}), 403
-        
-        if not bcrypt.checkpw(password.encode('utf-8'), user.password.encode('utf-8')):
+        if not user or not user.check_password(password):
+            logger.warning(f"Invalid credentials for {admission_number}")
             return jsonify({"error": "Invalid admission number or password"}), 401
 
-        # Include departmentcode in the token
+        logger.debug(f"User found: {user.admission_number}, Role: {user.role}")
+        
         access_token = create_access_token(
             identity=user.admission_number,
-            additional_claims={"role": user.role, "departmentcode": user.departmentcode}
+            additional_claims={
+                "role": user.role,
+                "departmentcode": user.departmentcode,
+                "semester": user.semester if user.role == 'student' else None
+            }
         )
 
+        logger.info(f"Login successful for {admission_number}")
         return jsonify({
             "message": "Login successful",
             "user": user.to_dict(),
             "token": access_token
         }), 200
-
     except Exception as e:
+        logger.error(f"Login error: {str(e)}")
         return jsonify({"error": "Internal Server Error", "details": str(e)}), 500
 
 @auth_bp.route('/request_otp', methods=['POST'])
@@ -69,20 +71,16 @@ def request_otp():
         if not user:
             return jsonify({"error": "User not found"}), 404
         
-        # Generate OTP
         otp = secrets.token_hex(3).upper()  # 6-character OTP
         expires = datetime.utcnow() + timedelta(minutes=10)
-        
-        # Store OTP
         otp_store[admission_number] = {"otp": otp, "expires": expires}
         
-        # Send OTP via email
         sender_email = os.getenv("SMTP_EMAIL")
         sender_password = os.getenv("SMTP_PASSWORD")
         if not sender_email or not sender_password:
             return jsonify({"error": "Email configuration missing"}), 500
 
-        msg = MIMEText(f"Your OTP for password reset is: {otp}\nThis OTP is valid for 10 minutes.")
+        msg = MIMEText(f"Your OTP for password reset is: {otp}\nValid for 10 minutes.")
         msg['Subject'] = 'Password Reset OTP'
         msg['From'] = sender_email
         msg['To'] = user.email
@@ -94,11 +92,12 @@ def request_otp():
 
         return jsonify({"message": "OTP sent to your email"}), 200
     except smtplib.SMTPException as e:
+        logger.error(f"SMTP error: {str(e)}")
         return jsonify({"error": "Failed to send OTP", "details": f"SMTP error: {str(e)}"}), 500
     except Exception as e:
+        logger.error(f"Failed to send OTP: {str(e)}")
         return jsonify({"error": "Failed to send OTP", "details": str(e)}), 500
-    
-    
+
 @auth_bp.route('/reset_password', methods=['POST'])
 def reset_password():
     try:
@@ -114,31 +113,39 @@ def reset_password():
         if not user:
             return jsonify({"error": "User not found"}), 404
 
-        # Verify OTP
         if admission_number not in otp_store:
             return jsonify({"error": "OTP not requested or expired"}), 401
         
         stored_otp_data = otp_store[admission_number]
-        if stored_otp_data["otp"] != otp:
-            return jsonify({"error": "Invalid OTP"}), 401
-        
-        if datetime.utcnow() > stored_otp_data["expires"]:
-            del otp_store[admission_number]  # Clean up expired OTP
-            return jsonify({"error": "OTP has expired"}), 401
+        if stored_otp_data["otp"] != otp or datetime.utcnow() > stored_otp_data["expires"]:
+            del otp_store[admission_number]
+            return jsonify({"error": "Invalid or expired OTP"}), 401
 
-        # OTP is valid, reset password
-        hashed_password = bcrypt.hashpw(new_password.encode('utf-8'), bcrypt.gensalt()).decode('utf-8')
-        user.password = hashed_password
+        user.set_password(new_password)
         db.session.commit()
-
-        # Clean up OTP after successful reset
         del otp_store[admission_number]
 
         return jsonify({"message": "Password reset successful"}), 200
     except Exception as e:
         db.session.rollback()
+        logger.error(f"Failed to reset password: {str(e)}")
         return jsonify({"error": "Failed to reset password", "details": str(e)}), 500
 
-if __name__ == '__main__':
-    app.register_blueprint(auth_bp, url_prefix='/api/auth')
-    app.run(debug=True, host='0.0.0.0', port=5001)
+@auth_bp.route('/refresh', methods=['POST'])
+@jwt_required(refresh=True)
+def refresh():
+    try:
+        current_user = get_jwt_identity()
+        user = User.query.filter_by(admission_number=current_user).first()
+        new_access_token = create_access_token(
+            identity=current_user,
+            additional_claims={
+                "role": user.role,
+                "departmentcode": user.departmentcode,
+                "semester": user.semester if user.role == 'student' else None
+            }
+        )
+        return jsonify({"access_token": new_access_token}), 200
+    except Exception as e:
+        logger.error(f"Refresh token error: {str(e)}")
+        return jsonify({"error": "Invalid refresh token", "details": str(e)}), 401
