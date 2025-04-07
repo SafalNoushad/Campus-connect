@@ -55,60 +55,51 @@ class _ProfilePageState extends State<ProfilePage> {
     phoneController.text = phone;
 
     // If token exists, fetch updated data from backend
-    if (token != null) {
-      try {
-        final response = await http.get(
-          Uri.parse('${NetworkConfig.getBaseUrl()}/api/students/profile'),
-          headers: {'Authorization': 'Bearer $token'},
-        );
-        print('Profile Response: ${response.statusCode} - ${response.body}');
+    try {
+      final response = await http.get(
+        Uri.parse('${NetworkConfig.getBaseUrl()}/api/students/profile'),
+        headers: {'Authorization': 'Bearer $token'},
+      );
+      print('Profile Response: ${response.statusCode} - ${response.body}');
 
-        if (response.statusCode == 200) {
-          final profile = json.decode(response.body);
-          setState(() {
-            admissionNumber = profile['admission_number'] ?? "N/A";
-            role = profile['role'] ?? "N/A";
-            email = profile['email'] ?? "N/A";
-            phone = profile['phone_number'] ?? "N/A";
-            username = profile['username'] ?? "User";
-            department = profile['departmentcode'] ?? "Unknown";
-          });
+      if (response.statusCode == 200) {
+        final profile = json.decode(response.body);
+        setState(() {
+          admissionNumber = profile['admission_number'] ?? "N/A";
+          role = profile['role'] ?? "N/A";
+          email = profile['email'] ?? "N/A";
+          phone = profile['phone_number'] ?? "N/A";
+          username = profile['username'] ?? "User";
+          department = profile['departmentcode'] ?? "Unknown";
+        });
 
-          // Update SharedPreferences with fresh data
-          await prefs.setString('admission_number', admissionNumber);
-          await prefs.setString('role', role);
-          await prefs.setString('email', email);
-          await prefs.setString('phone_number', phone);
-          await prefs.setString('username', username);
-          await prefs.setString('departmentcode', department);
+        // Update SharedPreferences with fresh data
+        await prefs.setString('admission_number', admissionNumber);
+        await prefs.setString('role', role);
+        await prefs.setString('email', email);
+        await prefs.setString('phone_number', phone);
+        await prefs.setString('username', username);
+        await prefs.setString('departmentcode', department);
 
-          // Update controllers
-          usernameController.text = username;
-          emailController.text = email;
-          phoneController.text = phone;
-        } else {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text('Failed to load profile: ${response.body}')),
-          );
-        }
-      } catch (e) {
+        // Update controllers
+        usernameController.text = username;
+        emailController.text = email;
+        phoneController.text = phone;
+      } else {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Error loading profile: $e')),
+          SnackBar(content: Text('Failed to load profile: ${response.body}')),
         );
       }
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Error loading profile: $e')),
+      );
     }
-  }
+    }
 
   Future<void> _updateUserData() async {
     SharedPreferences prefs = await SharedPreferences.getInstance();
     String? token = prefs.getString('jwt_token');
-
-    if (token == null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Please log in to edit profile')),
-      );
-      return;
-    }
 
     // Update backend
     try {
@@ -421,13 +412,6 @@ class _ProfilePageState extends State<ProfilePage> {
   void _showEditProfileDialog() async {
     SharedPreferences prefs = await SharedPreferences.getInstance();
     String? token = prefs.getString('jwt_token');
-
-    if (token == null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Please log in to edit profile')),
-      );
-      return;
-    }
 
     showDialog(
       context: context,

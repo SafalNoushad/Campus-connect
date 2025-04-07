@@ -5,6 +5,8 @@ import 'package:shared_preferences/shared_preferences.dart';
 import '../utils/network_config.dart';
 
 class StudentsPage extends StatefulWidget {
+  const StudentsPage({super.key});
+
   @override
   _StudentsPageState createState() => _StudentsPageState();
 }

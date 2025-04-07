@@ -299,7 +299,7 @@ class _HodAnnouncementsPageState extends State<HodAnnouncementsPage> {
                       children: [
                         ...generalAnnouncements
                             .map((a) => _buildAnnouncementTile(a, false))
-                            .toList(),
+                            ,
                         if (deptAnnouncements.isNotEmpty) ...[
                           const SizedBox(height: 16),
                           const Text('Department Announcements',
@@ -307,7 +307,7 @@ class _HodAnnouncementsPageState extends State<HodAnnouncementsPage> {
                                   fontSize: 18, fontWeight: FontWeight.bold)),
                           ...deptAnnouncements
                               .map((a) => _buildAnnouncementTile(a, true))
-                              .toList(),
+                              ,
                         ],
                       ],
                     ),

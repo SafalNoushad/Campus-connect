@@ -131,7 +131,7 @@ class _AnnouncementsPageState extends State<AnnouncementsPage> {
                           ...generalAnnouncements
                               .map((announcement) => _buildAnnouncementTile(
                                   announcement, 'General'))
-                              .toList(),
+                              ,
                         if (deptAnnouncements.isNotEmpty) ...[
                           const SizedBox(height: 16),
                           const Text('Department Announcements',
@@ -140,7 +140,7 @@ class _AnnouncementsPageState extends State<AnnouncementsPage> {
                           ...deptAnnouncements
                               .map((announcement) => _buildAnnouncementTile(
                                   announcement, 'Department'))
-                              .toList(),
+                              ,
                         ],
                       ],
                     ),
@@ -162,7 +162,7 @@ class _AnnouncementsPageState extends State<AnnouncementsPage> {
         ),
         title: Text(announcement['title'],
             style: const TextStyle(fontWeight: FontWeight.bold)),
-        subtitle: Text('${announcement['message']}\n${type}'),
+        subtitle: Text('${announcement['message']}\n$type'),
         onTap: () {
           showDialog(
             context: context,

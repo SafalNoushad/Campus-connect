@@ -97,7 +97,7 @@ class _StaffAnnouncementsPageState extends State<StaffAnnouncementsPage> {
                       children: [
                         ...generalAnnouncements
                             .map((a) => _buildAnnouncementTile(a))
-                            .toList(),
+                            ,
                         if (deptAnnouncements.isNotEmpty) ...[
                           const SizedBox(height: 16),
                           const Text('Department Announcements',
@@ -105,7 +105,7 @@ class _StaffAnnouncementsPageState extends State<StaffAnnouncementsPage> {
                                   fontSize: 18, fontWeight: FontWeight.bold)),
                           ...deptAnnouncements
                               .map((a) => _buildAnnouncementTile(a))
-                              .toList(),
+                              ,
                         ],
                       ],
                     ),

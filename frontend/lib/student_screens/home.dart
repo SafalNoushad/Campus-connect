@@ -12,6 +12,8 @@ import 'package:http/http.dart' show MultipartRequest;
 import 'package:path_provider/path_provider.dart';
 import 'package:open_file/open_file.dart';
 import '../utils/network_config.dart';
+import 'package:permission_handler/permission_handler.dart';
+import 'package:device_info_plus/device_info_plus.dart';
 
 class HomeScreen extends StatefulWidget {
   final Map<String, String> userData;
@@ -175,11 +177,13 @@ class HomeContentState extends State<HomeContent> {
     if (widget.token != null) {
       _fetchSubjects();
       _fetchTeachers();
-      _fetchAssignments(); // Fetch assignments on init to display on home screen
+      _fetchAssignments();
+      _fetchRequests();
     } else {
       setState(() {
         _isLoadingSubjects = false;
         _isLoadingTeachers = false;
+        _isLoadingRequests = false;
       });
     }
   }
@@ -267,7 +271,6 @@ class HomeContentState extends State<HomeContent> {
         final data = json.decode(response.body);
         List<dynamic> assignmentList;
 
-        // Handle both flat list and wrapped response
         if (data is List) {
           assignmentList = data;
         } else if (data is Map<String, dynamic> &&
@@ -311,42 +314,6 @@ class HomeContentState extends State<HomeContent> {
       setState(() => _isLoadingAssignments = false);
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('Error fetching assignments: $e')),
-      );
-    }
-  }
-
-  Future<void> _fetchRequests() async {
-    setState(() {
-      _isLoadingRequests = true;
-    });
-    try {
-      final response = await http.get(
-        Uri.parse('${NetworkConfig.getBaseUrl()}/api/students/requests'),
-        headers: {'Authorization': 'Bearer ${widget.token}'},
-      );
-      print('Requests Response: ${response.statusCode} - ${response.body}');
-      if (response.statusCode == 200) {
-        final data = json.decode(response.body);
-        setState(() {
-          _requests = List<Map<String, dynamic>>.from(data);
-          _isLoadingRequests = false;
-          _requestsFetched = true;
-        });
-        if (_requests.isEmpty) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('No requests found')),
-          );
-        }
-      } else {
-        setState(() => _isLoadingRequests = false);
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Failed to load requests: ${response.body}')),
-        );
-      }
-    } catch (e) {
-      setState(() => _isLoadingRequests = false);
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Error fetching requests: $e')),
       );
     }
   }
@@ -507,193 +474,235 @@ class HomeContentState extends State<HomeContent> {
     );
   }
 
-  Future<void> _editRequest(Map<String, dynamic> request) async {
-    String? category = request['category'].replaceAll('_', ' ').toUpperCase();
-    PlatformFile? requestFile;
+  Future<bool> _requestStoragePermission() async {
+    if (!Platform.isAndroid) return true;
 
-    showDialog(
-      context: context,
-      builder: (context) => StatefulBuilder(
-        builder: (context, setDialogState) => AlertDialog(
-          title: const Text('Edit Request'),
-          content: SingleChildScrollView(
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                DropdownButtonFormField<String>(
-                  decoration: InputDecoration(
-                    labelText: 'Application Category',
-                    border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(10)),
-                  ),
-                  value: category,
-                  items: ['Medical Leave', 'Duty Leave']
-                      .map((cat) =>
-                          DropdownMenuItem(value: cat, child: Text(cat)))
-                      .toList(),
-                  onChanged: (value) => setDialogState(() => category = value),
-                  validator: (value) =>
-                      value == null ? 'Please select a category' : null,
-                ),
-                const SizedBox(height: 10),
-                ElevatedButton(
-                  onPressed: () async {
-                    FilePickerResult? result =
-                        await FilePicker.platform.pickFiles(
-                      type: FileType.custom,
-                      allowedExtensions: ['pdf'],
-                    );
-                    if (result != null) {
-                      setDialogState(() => requestFile = result.files.first);
-                    }
-                  },
-                  style: ElevatedButton.styleFrom(
-                      backgroundColor: Colors.grey[300]),
-                  child: Text(requestFile == null
-                      ? 'Replace PDF (Optional)'
-                      : 'File: ${requestFile!.name}'),
-                ),
-              ],
-            ),
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.of(context).pop(),
-              child: const Text('Cancel'),
-            ),
-            ElevatedButton(
-              onPressed: () async {
-                if (category != null) {
-                  try {
-                    var requestToSend = MultipartRequest(
-                      'PUT',
-                      Uri.parse(
-                          '${NetworkConfig.getBaseUrl()}/api/students/requests/${request['id']}'),
-                    );
-                    requestToSend.headers['Authorization'] =
-                        'Bearer ${widget.token}';
-                    requestToSend.fields['category'] =
-                        category!.toLowerCase().replaceAll(' ', '_');
-                    if (requestFile != null) {
-                      requestToSend.files.add(await http.MultipartFile.fromPath(
-                          'file', requestFile!.path!));
-                    }
-                    final response = await requestToSend.send();
-                    final responseBody = await response.stream.bytesToString();
-                    print(
-                        'Edit Request Response: ${response.statusCode} - $responseBody');
+    final deviceInfo = await DeviceInfoPlugin().androidInfo;
+    final sdkInt = deviceInfo.version.sdkInt;
 
-                    if (response.statusCode == 200) {
-                      Navigator.of(context).pop();
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(
-                            content: Text('Request updated successfully!')),
-                      );
-                      _fetchRequests();
-                    } else {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        SnackBar(
-                            content: Text(
-                                'Failed to update request: $responseBody')),
-                      );
-                    }
-                  } catch (e) {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      SnackBar(content: Text('Error updating request: $e')),
-                    );
-                  }
-                } else {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(content: Text('Please select a category')),
-                  );
-                }
-              },
-              style: ElevatedButton.styleFrom(
-                  backgroundColor: Colors.blueAccent,
-                  shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(10))),
-              child: const Text('Update'),
-            ),
-          ],
-        ),
-      ),
-    );
+    if (sdkInt <= 29) {
+      if (await Permission.storage.isDenied) {
+        var status = await Permission.storage.request();
+        if (!status.isGranted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+                content: Text(
+                    'Storage permission denied. Please enable it in settings.')),
+          );
+          return false;
+        }
+      }
+    }
+    return true;
   }
 
-  Future<void> _removeRequest(int requestId) async {
+  Future<void> _downloadRequest(String filename) async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final token = prefs.getString('jwt_token');
+      if (token == null) {
+        Navigator.pushReplacementNamed(context, '/login');
+        return;
+      }
+
+      final response = await http.get(
+        Uri.parse(
+            '${NetworkConfig.getBaseUrl()}/api/students/download/requests/$filename'),
+        headers: {'Authorization': 'Bearer $token'},
+      );
+
+      if (response.statusCode == 200) {
+        final directory = await getApplicationDocumentsDirectory();
+        final filePath = '${directory.path}/$filename';
+        final file = File(filePath);
+        await file.writeAsBytes(response.bodyBytes);
+
+        final result = await OpenFile.open(filePath);
+        if (result.type == ResultType.done) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('Downloaded and opened $filename')),
+          );
+        } else {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('Downloaded $filename to $filePath')),
+          );
+        }
+      } else {
+        throw Exception(
+            'Failed to download: ${response.statusCode} - ${response.body}');
+      }
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Error downloading request: $e')),
+      );
+    }
+  }
+
+  Future<void> _editRequest(Map<String, dynamic> request) async {
+    if (request['application_id'] == null ||
+        request['application_id'] is! int) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Invalid request ID')),
+      );
+      return;
+    }
+
+    // Convert backend category to title case to match dropdown items
+    String? rawCategory = request['category'] as String?;
+    String initialCategory = '';
+    if (rawCategory != null) {
+      String lowerCase = rawCategory.replaceAll('_', ' ').toLowerCase();
+      initialCategory = lowerCase.replaceAllMapped(
+        RegExp(r'(^|\s)\w'),
+        (Match match) => match.group(0)!.toUpperCase(),
+      );
+    }
+
+    TextEditingController categoryController =
+        TextEditingController(text: initialCategory);
+
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
-        title: const Text('Confirm Deletion'),
-        content: const Text('Are you sure you want to delete this request?'),
+        title: const Text('Edit Request'),
+        content: DropdownButtonFormField<String>(
+          decoration: const InputDecoration(labelText: 'Category'),
+          value: initialCategory.isEmpty ? null : initialCategory,
+          items: ['Medical Leave', 'Duty Leave']
+              .map((cat) => DropdownMenuItem(value: cat, child: Text(cat)))
+              .toList(),
+          onChanged: (value) => categoryController.text = value ?? '',
+          validator: (value) =>
+              value == null ? 'Please select a category' : null,
+        ),
         actions: [
           TextButton(
-            onPressed: () => Navigator.of(context).pop(),
+            onPressed: () => Navigator.pop(context),
             child: const Text('Cancel'),
           ),
-          ElevatedButton(
+          TextButton(
             onPressed: () async {
               try {
-                final response = await http.delete(
-                  Uri.parse(
-                      '${NetworkConfig.getBaseUrl()}/api/students/requests/$requestId'),
-                  headers: {'Authorization': 'Bearer ${widget.token}'},
+                final prefs = await SharedPreferences.getInstance();
+                final token = prefs.getString('jwt_token');
+                if (token == null) {
+                  Navigator.pushReplacementNamed(context, '/login');
+                  return;
+                }
+
+                final url =
+                    '${NetworkConfig.getBaseUrl()}/api/students/requests/${request['application_id']}';
+                print('PUT Request URL: $url');
+                final response = await http.put(
+                  Uri.parse(url),
+                  headers: {
+                    'Authorization': 'Bearer $token',
+                    'Content-Type': 'application/json',
+                  },
+                  body: json.encode({
+                    'category': categoryController.text
+                        .toLowerCase()
+                        .replaceAll(' ', '_'),
+                  }),
                 );
-                print(
-                    'Delete Request Response: ${response.statusCode} - ${response.body}');
+
+                print('Response: ${response.statusCode} - ${response.body}');
                 if (response.statusCode == 200) {
-                  Navigator.of(context).pop();
+                  await _fetchRequests();
+                  Navigator.pop(context);
                   ScaffoldMessenger.of(context).showSnackBar(
                     const SnackBar(
-                        content: Text('Request deleted successfully!')),
+                        content: Text('Request updated successfully')),
                   );
-                  _fetchRequests();
                 } else {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(
-                        content:
-                            Text('Failed to delete request: ${response.body}')),
-                  );
+                  final errorBody = json.decode(response.body);
+                  throw Exception(
+                      'Failed to edit: ${response.statusCode} - ${errorBody['error'] ?? response.body}');
                 }
               } catch (e) {
                 ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(content: Text('Error deleting request: $e')),
+                  SnackBar(content: Text('Error editing request: $e')),
                 );
               }
             },
-            style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
-            child: const Text('Delete'),
+            child: const Text('Save'),
           ),
         ],
       ),
     );
   }
 
-  Future<void> _downloadRequest(String filename) async {
+  Future<void> _removeRequest(int requestId) async {
     try {
-      final response = await http.get(
-        Uri.parse(
-            '${NetworkConfig.getBaseUrl()}/api/students/download/requests/$filename'),
-        headers: {'Authorization': 'Bearer ${widget.token}'},
+      final prefs = await SharedPreferences.getInstance();
+      final token = prefs.getString('jwt_token');
+      if (token == null) {
+        Navigator.pushReplacementNamed(context, '/login');
+        return;
+      }
+
+      final url =
+          '${NetworkConfig.getBaseUrl()}/api/students/requests/$requestId';
+      print('DELETE Request URL: $url');
+      final response = await http.delete(
+        Uri.parse(url),
+        headers: {'Authorization': 'Bearer $token'},
       );
+
+      print('Response: ${response.statusCode} - ${response.body}');
       if (response.statusCode == 200) {
-        final directory = await getExternalStorageDirectory();
-        final filePath = '${directory!.path}/$filename';
-        final file = File(filePath);
-        await file.writeAsBytes(response.bodyBytes);
+        await _fetchRequests();
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Request downloaded to $filePath')),
+          const SnackBar(content: Text('Request deleted successfully')),
         );
-        OpenFile.open(filePath);
       } else {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-              content: Text('Failed to download request: ${response.body}')),
-        );
+        final errorBody = json.decode(response.body);
+        throw Exception(
+            'Failed to delete: ${response.statusCode} - ${errorBody['error'] ?? response.body}');
       }
     } catch (e) {
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Error downloading request: $e')),
+        SnackBar(content: Text('Error deleting request: $e')),
+      );
+    }
+  }
+
+  Future<void> _fetchRequests() async {
+    setState(() {
+      _isLoadingRequests = true;
+    });
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final token = prefs.getString('jwt_token');
+      if (token == null) {
+        Navigator.pushReplacementNamed(context, '/login');
+        return;
+      }
+
+      final response = await http.get(
+        Uri.parse('${NetworkConfig.getBaseUrl()}/api/students/requests'),
+        headers: {'Authorization': 'Bearer $token'},
+      );
+
+      print(
+          'Fetch Requests Response: ${response.statusCode} - ${response.body}');
+      if (response.statusCode == 200) {
+        setState(() {
+          _requests =
+              List<Map<String, dynamic>>.from(json.decode(response.body));
+          _requestsFetched = true;
+          _isLoadingRequests = false;
+        });
+      } else {
+        throw Exception(
+            'Failed to load requests: ${response.statusCode} - ${response.body}');
+      }
+    } catch (e) {
+      setState(() {
+        _isLoadingRequests = false;
+      });
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Error fetching requests: $e')),
       );
     }
   }
@@ -959,7 +968,7 @@ class HomeContentState extends State<HomeContent> {
                         ),
             ],
             const SizedBox(height: 20),
-            // Assignments Title Bar (for reference, but not primary display)
+            // Assignments Title Bar
             GestureDetector(
               onTap: _toggleAssignments,
               child: Container(
@@ -1098,16 +1107,24 @@ class HomeContentState extends State<HomeContent> {
                             )
                           : Column(
                               children: _requests.map((request) {
+                                final requestId = request['application_id'];
+                                if (requestId == null || requestId is! int) {
+                                  return const ListTile(
+                                    title: Text('Invalid Request'),
+                                    subtitle: Text('Missing or invalid ID'),
+                                  );
+                                }
                                 return ListTile(
                                   leading: const Icon(Icons.request_page,
                                       color: Colors.grey),
                                   title: Text(
                                       request['category']
-                                          .replaceAll('_', ' ')
-                                          .toUpperCase(),
+                                              ?.replaceAll('_', ' ')
+                                              ?.toUpperCase() ??
+                                          'N/A',
                                       style: const TextStyle(fontSize: 16)),
-                                  subtitle:
-                                      Text('Status: ${request['status']}'),
+                                  subtitle: Text(
+                                      'Status: ${request['status'] ?? 'N/A'}'),
                                   trailing: Row(
                                     mainAxisSize: MainAxisSize.min,
                                     children: [
@@ -1126,7 +1143,7 @@ class HomeContentState extends State<HomeContent> {
                                         icon: const Icon(Icons.delete,
                                             color: Colors.red),
                                         onPressed: () =>
-                                            _removeRequest(request['id']),
+                                            _removeRequest(requestId),
                                       ),
                                     ],
                                   ),

@@ -181,7 +181,7 @@ class _ChatbotPageState extends State<ChatbotPage> {
   }
 
   void _renameChat() {
-    TextEditingController _renameController =
+    TextEditingController renameController =
         TextEditingController(text: _chatTitle);
     showDialog(
       context: context,
@@ -189,7 +189,7 @@ class _ChatbotPageState extends State<ChatbotPage> {
         return AlertDialog(
           title: const Text("Rename Chat"),
           content: TextField(
-            controller: _renameController,
+            controller: renameController,
             decoration: const InputDecoration(hintText: "Enter new chat name"),
           ),
           actions: [
@@ -200,7 +200,7 @@ class _ChatbotPageState extends State<ChatbotPage> {
             TextButton(
               onPressed: () {
                 setState(() {
-                  _chatTitle = _renameController.text;
+                  _chatTitle = renameController.text;
                   if (_selectedChatIndex != -1) {
                     _chatSessions[_selectedChatIndex]["name"] = _chatTitle;
                   } else if (_messages.isNotEmpty) {

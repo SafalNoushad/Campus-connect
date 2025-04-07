@@ -482,3 +482,74 @@ def download_request(filename):
     except Exception as e:
         logger.error(f"Failed to download request {filename} for student {admission_number}: {str(e)}")
         return jsonify({'error': 'Failed to download request', 'details': str(e)}), 500
+    
+@students_bp.route('/requests/<int:request_id>', methods=['PUT'])
+@jwt_required()
+@role_required('student')
+def edit_request(request_id):
+    try:
+        current_user = get_jwt()
+        admission_number = current_user.get('sub')
+
+        logger.info(f"Student {admission_number} attempting to edit request {request_id}")
+
+        # Check if request exists and belongs to the student
+        request_entry = Requests.query.filter_by(application_id=request_id, admission_number=admission_number).first()
+        if not request_entry:
+            logger.warning(f"Request {request_id} not found or not authorized for student {admission_number}")
+            return jsonify({'error': 'Request not found or not authorized'}), 404
+
+        data = request.get_json()
+        logger.debug(f"Received data: {data}")
+        if not data or 'category' not in data:
+            logger.warning(f"Missing category in edit request for student {admission_number}")
+            return jsonify({'error': 'Missing category'}), 400
+
+        category = data['category']
+        if category not in ['medical_leave', 'duty_leave']:
+            logger.warning(f"Invalid category {category} for student {admission_number}")
+            return jsonify({'error': 'Invalid category'}), 400
+
+        # Update the request
+        request_entry.category = category
+        db.session.commit()
+
+        logger.info(f"Student {admission_number} edited request {request_id}")
+        return jsonify({'message': 'Request updated successfully', 'request': request_entry.to_dict()}), 200
+    except Exception as e:
+        db.session.rollback()
+        logger.error(f"Failed to edit request {request_id} for student {admission_number}: {str(e)}", exc_info=True)
+        return jsonify({'error': 'Internal Server Error', 'details': str(e)}), 500
+
+@students_bp.route('/requests/<int:request_id>', methods=['DELETE'])
+@jwt_required()
+@role_required('student')
+def delete_request(request_id):
+    try:
+        current_user = get_jwt()
+        admission_number = current_user.get('sub')
+
+        logger.info(f"Student {admission_number} attempting to delete request {request_id}")
+
+        # Check if request exists and belongs to the student
+        request_entry = Requests.query.filter_by(application_id=request_id, admission_number=admission_number).first()
+        if not request_entry:
+            logger.warning(f"Request {request_id} not found or not authorized for student {admission_number}")
+            return jsonify({'error': 'Request not found or not authorized'}), 404
+
+        # Delete the file from storage
+        file_path = os.path.join(REQUESTS_FOLDER, request_entry.filename)
+        if os.path.exists(file_path):
+            os.remove(file_path)
+            logger.info(f"Deleted request file {file_path} for student {admission_number}")
+
+        # Delete the request from the database
+        db.session.delete(request_entry)
+        db.session.commit()
+
+        logger.info(f"Student {admission_number} deleted request {request_id}")
+        return jsonify({'message': 'Request deleted successfully'}), 200
+    except Exception as e:
+        db.session.rollback()
+        logger.error(f"Failed to delete request {request_id} for student {admission_number}: {str(e)}", exc_info=True)
+        return jsonify({'error': 'Internal Server Error', 'details': str(e)}), 500

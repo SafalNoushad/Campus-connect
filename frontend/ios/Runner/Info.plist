@@ -45,5 +45,25 @@
 		<string>UIInterfaceOrientationLandscapeLeft</string>
 		<string>UIInterfaceOrientationLandscapeRight</string>
 	</array>
+	<!-- Allow HTTP requests -->
+	<key>NSAppTransportSecurity</key>
+	<dict>
+		<key>NSAllowsArbitraryLoads</key>
+		<true/>
+	</dict>
+	<!-- Permissions for file_picker, image_picker, etc. -->
+	<key>NSPhotoLibraryUsageDescription</key>
+	<string>Campus Connect needs access to your photo library to select images or files.</string>
+	<key>NSPhotoLibraryAddUsageDescription</key>
+	<string>Campus Connect needs access to save images or files to your photo library.</string>
+	<key>NSCameraUsageDescription</key>
+	<string>Campus Connect needs access to your camera to take pictures.</string>
+	<key>NSMicrophoneUsageDescription</key>
+	<string>Campus Connect needs access to your microphone for potential audio features.</string>
+	<key>NSAppleMusicUsageDescription</key>
+	<string>Campus Connect needs access to your media library for file selection.</string>
+	<!-- Minimum iOS version (optional, align with Podfile) -->
+	<key>MinimumOSVersion</key>
+	<string>12.0</string>
 </dict>
 </plist>

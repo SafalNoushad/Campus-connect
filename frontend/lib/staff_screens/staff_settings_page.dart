@@ -38,11 +38,6 @@ class _StaffSettingsPageState extends State<StaffSettingsPage> {
     SharedPreferences prefs = await SharedPreferences.getInstance();
     String? token = prefs.getString('jwt_token');
 
-    if (token == null) {
-      Navigator.pushReplacementNamed(context, '/login');
-      return;
-    }
-
     try {
       final response = await http.get(
         Uri.parse('${NetworkConfig.getBaseUrl()}/api/staff/profile'),
@@ -82,11 +77,6 @@ class _StaffSettingsPageState extends State<StaffSettingsPage> {
   Future<void> _updateUserData() async {
     SharedPreferences prefs = await SharedPreferences.getInstance();
     String? token = prefs.getString('jwt_token');
-
-    if (token == null) {
-      Navigator.pushReplacementNamed(context, '/login');
-      return;
-    }
 
     try {
       final response = await http.put(

@@ -40,7 +40,7 @@ class LoginScreenState extends State<LoginScreen> {
       debugPrint('  Role: $role');
       debugPrint('  All keys: ${prefs.getKeys()}');
 
-      if (token != null && role != null) {
+      if (role != null) {
         _navigateBasedOnRole(role, prefs);
       }
     } catch (e) {

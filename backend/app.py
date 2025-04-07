@@ -26,7 +26,7 @@ def create_app():
         os.makedirs(folder, exist_ok=True)
 
     # Configure CORS
-    frontend_url = os.getenv('FRONTEND_URL', 'http://localhost:5001')
+    frontend_url = os.getenv('FRONTEND_URL', 'http://localhost:5001')  # Default for local testing
     CORS(app, resources={
         r"/api/*": {"origins": frontend_url},
         r"/uploads/*": {"origins": frontend_url}
@@ -61,8 +61,8 @@ def create_app():
         from routes.hod import hod_bp
         from routes.profile import profile_bp
         from routes.chatbot import chatbot_bp
-        from routes.announcement import announcement_bp  # Already present
-        from routes.department_announcement import department_announcement_bp  # New import
+        from routes.announcement import announcement_bp
+        from routes.department_announcement import department_announcement_bp
 
         app.register_blueprint(auth_bp, url_prefix='/api/auth')
         app.register_blueprint(admin_bp, url_prefix='/api/admin')
@@ -72,12 +72,17 @@ def create_app():
         app.register_blueprint(profile_bp, url_prefix='/api/users')
         app.register_blueprint(chatbot_bp, url_prefix='/api/chatbot')
         app.register_blueprint(announcement_bp, url_prefix='/api/announcements')
-        app.register_blueprint(department_announcement_bp, url_prefix='/api/department_announcements')  # New blueprint
+        app.register_blueprint(department_announcement_bp, url_prefix='/api/department_announcements')
 
         logger.info("All blueprints registered successfully.")
     except ImportError as e:
         logger.error(f"Failed to import blueprints: {str(e)}")
         raise
+
+    # Add a root route for testing
+    @app.route('/')
+    def home():
+        return jsonify({"message": "Backend is running! Use /api/... endpoints for functionality."})
 
     # Token revocation check (placeholder)
     @jwt.token_in_blocklist_loader
@@ -92,6 +97,7 @@ def create_app():
         return jsonify({"error": "Internal server error", "details": str(e)}), 500
 
     return app
+
 
 if __name__ == '__main__':
     app = create_app()

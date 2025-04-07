@@ -72,13 +72,6 @@ class _HodDashboardState extends State<HodDashboard> {
         title: Text(_titles[_selectedIndex]), // Dynamic title based on tab
         backgroundColor: Colors.blueAccent,
         elevation: 4,
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.logout),
-            onPressed: () => _logout(context),
-            tooltip: 'Logout',
-          ),
-        ],
       ),
       body: _pages[_selectedIndex], // Display the selected page
       bottomNavigationBar: BottomNavigationBar(
