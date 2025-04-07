@@ -10,8 +10,9 @@ from dotenv import load_dotenv
 from PyPDF2 import PdfReader
 from io import BytesIO
 import logging
+import re
 
-# Import db and models at the top, assuming app.py initializes db first
+# Import db and models
 from database import db
 from models import User, Department, Notes, Timetable, Subject
 
@@ -33,6 +34,10 @@ HEADERS = {
     "Content-Type": "application/json"
 }
 
+# Define the uploads/notes folder path
+NOTES_FOLDER = os.path.join(os.path.dirname(__file__), '../uploads/notes')
+os.makedirs(NOTES_FOLDER, exist_ok=True)
+
 def extract_pdf_text(file_data, max_chars=5000):
     """Extract text from a PDF file."""
     try:
@@ -44,6 +49,45 @@ def extract_pdf_text(file_data, max_chars=5000):
     except Exception as e:
         logger.error(f"PDF extraction error: {str(e)}")
         return f"Error extracting PDF text: {str(e)}"
+
+def find_matching_note_file(query):
+    """Search for a matching note file in the uploads/notes folder based on the query."""
+    try:
+        query_lower = query.lower()
+        semester_match = re.search(r's(\d+)', query_lower)  # Extract semester (e.g., S8)
+        subject_match = re.search(r'(embedded system|computer science|mechanics|electronics|[\w\s]+)', query_lower)  # Extract subject/topic
+        module_match = re.search(r'module\s*(\d+)', query_lower)  # Extract module number
+
+        semester = semester_match.group(1) if semester_match else None
+        subject = subject_match.group(1).replace(" ", "_") if subject_match else None
+        module = module_match.group(1) if module_match else None
+
+        # Construct possible filename patterns
+        patterns = []
+        if semester and subject and module:
+            patterns.append(f"S{semester}_{subject}_Module{module}".lower())
+        if semester and subject:
+            patterns.append(f"S{semester}_{subject}".lower())
+        if semester and module:
+            patterns.append(f"S{semester}_.*_Module{module}".lower())
+        if semester:
+            patterns.append(f"S{semester}_.*".lower())
+
+        for filename in os.listdir(NOTES_FOLDER):
+            filename_lower = filename.lower()
+            if filename_lower.endswith('.pdf'):
+                for pattern in patterns:
+                    if re.search(pattern, filename_lower):
+                        file_path = os.path.join(NOTES_FOLDER, filename)
+                        with open(file_path, 'rb') as f:
+                            file_data = f.read()
+                        logger.info(f"Matched note file: {filename}")
+                        return filename, file_data
+        logger.info(f"No matching note file found for query: {query}")
+        return None, None
+    except Exception as e:
+        logger.error(f"Error searching notes folder: {str(e)}")
+        return None, None
 
 def fetch_database_context(user_message):
     """Fetch relevant campus data based on the user's query."""
@@ -177,12 +221,14 @@ async def async_post_to_openrouter(payload):
 @chatbot_bp.route('/chat', methods=['POST'])
 @jwt_required()
 async def chatbot():
-    """Handle chat requests as a general chatbot with campus query support."""
+    """Handle chat requests as a general chatbot with campus query support and notes access."""
     logger.info(f"Received request: Content-Type={request.content_type}, Headers={request.headers}")
     
     user_message = None
     pdf_text = None
     file_name = None
+    notes_pdf_text = None
+    matched_note_filename = None
 
     try:
         if request.content_type.startswith('multipart/form-data'):
@@ -212,6 +258,12 @@ async def chatbot():
         current_user = get_jwt_identity()
         logger.info(f"Authenticated user: {current_user}")
 
+        # Check for notes-related query and fetch matching file from uploads/notes
+        if user_message and "notes" in user_message.lower():
+            matched_note_filename, note_file_data = find_matching_note_file(user_message)
+            if note_file_data:
+                notes_pdf_text = extract_pdf_text(note_file_data)
+
         db_context = fetch_database_context(user_message) if user_message else None
 
         if pdf_text:
@@ -222,6 +274,12 @@ async def chatbot():
             )
             if user_message:
                 prompt = f"{user_message}\n\n{prompt}"
+        elif notes_pdf_text:
+            prompt = (
+                f"Based on the following notes content from {matched_note_filename}:\n\n{notes_pdf_text}\n\n"
+                f"Explain the content in response to: {user_message}\n\n"
+                "Keep the explanation concise and educational."
+            )
         elif db_context:
             prompt = (
                 f"Answer based on this campus database:\n\n{db_context}\n\n"
@@ -239,12 +297,12 @@ async def chatbot():
                     "content": (
                         "You are a friendly chatbot. Respond naturally to any input. "
                         "For campus-related questions (e.g., HODs, staff, departments, students, subjects, notes, timetables), "
-                        "use the provided database context and keep responses accurate and educational. Otherwise, chat casually!"
+                        "use the provided database context or notes content and keep responses accurate and educational. Otherwise, chat casually!"
                     )
                 },
                 {"role": "user", "content": prompt}
             ],
-            "max_tokens": 300,
+            "max_tokens": 500,
             "temperature": 0.7
         }
 
@@ -269,6 +327,11 @@ async def chatbot():
                 "summary": summary,
                 "description": description,
                 "file_name": file_name or "Uploaded PDF"
+            }
+        elif notes_pdf_text:
+            response_dict = {
+                "response": ai_response,
+                "file_name": matched_note_filename
             }
         else:
             response_dict = {"response": ai_response}
